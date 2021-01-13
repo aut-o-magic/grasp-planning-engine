@@ -17,14 +17,30 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+
+# Octomap imports
+find_package(octomap REQUIRED)
+find_package(octomap_msgs REQUIRED)
+include_directories(${OCTOMAP_INCLUDE_DIRS})
+
+set(dependencies
+  rclcpp
+  octomap_msgs
+)
 
 add_executable(gp_node src/gp_node.cpp)
 target_include_directories(gp_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+ament_target_dependencies(gp_node
+  ${dependencies}
+)
+
+target_link_libraries(gp_node
+${OCTOMAP_LIBRARIES}
+)
 
 install(TARGETS gp_node
   DESTINATION lib/${PROJECT_NAME})

@@ -7,11 +7,12 @@
   <maintainer email="marti.vilella@esa.int">Marti Vilella</maintainer>
   <license>TODO: License declaration</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_ros</buildtool_depend>
   <build_depend>octomap</build_depend>
   <exec_depend>octomap</exec_depend>
   <depend>rclcpp</depend>
   <depend>octomap_msgs</depend>
+  <depend>octomap_grasping</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

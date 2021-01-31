@@ -1,11 +1,12 @@
 #include <cstdio>
 #include <chrono>
-#include <octomap/octomap.h>
 #include <octomap_msgs/msg/octomap.hpp>
 #include "rclcpp/rclcpp.hpp"
 
-#include <Eigen/StdVector>
-#include <Eigen/Geometry>
+//#include <Eigen/StdVector>
+//#include <Eigen/Geometry>
+
+#include "gp_engine.cpp"
 
 using namespace std::chrono_literals;
 
@@ -13,11 +14,12 @@ class gpNode : public rclcpp::Node
 {
 public:
     gpNode()
-        : Node("gpNode"), count_(0)
+        : Node("gpNode"), count_(0), gq_map_(0.1)
     {
         //pub_ = this->create_publisher<octomap_msgs::msg::Octomap>("octomap", 10); // TODO create octree publisher
         timer_ = this->create_wall_timer(10s, std::bind(&gpNode::timer_callback, this));
         sub_ = this->create_subscription<octomap_msgs::msg::Octomap>("input_octomap", 10, std::bind(&gpNode::topic_callback, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "GP Node Construction done");
     }
 
 private:
@@ -42,7 +44,8 @@ private:
     //rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
     rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr sub_;
     rclcpp::TimerBase::SharedPtr timer_;
-    Eigen::Affine3f prev_Ti_;
+    //Eigen::Affine3f prev_Ti_;
+    graspQualityMap gq_map_;
 };
 
 int main(int argc, char **argv)

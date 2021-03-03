@@ -1,0 +1,3 @@
+name: grasp-planning-engine
+type: cmake
+dependencies: [octomap, octomap_grasping]

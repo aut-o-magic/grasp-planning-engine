@@ -25,7 +25,8 @@ include_directories(
 # Octomap imports
 find_package(octomap REQUIRED)
 find_package(octomap_grasping REQUIRED)
-include_directories(${OCTOMAP_INCLUDE_DIRS}
+include_directories(
+${OCTOMAP_INCLUDE_DIRS}
 ${octomap_grasping_INCLUDE_DIRS}
 )
 
@@ -33,6 +34,11 @@ add_library(gp_engine src/gp_engine.cpp)
 target_include_directories(gp_engine PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+target_link_libraries(gp_engine
+${OCTOMAP_LIBRARIES}
+${octomap_grasping_LIBRARIES}
+)
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.

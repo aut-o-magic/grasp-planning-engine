@@ -1,8 +1,6 @@
 #include <cstdio>
 #include <chrono>
-#include <octomap_msgs/msg/octomap.hpp>
-#include "rclcpp/rclcpp.hpp"
-
+#include <octomap/OcTree.h>
 //#include <Eigen/StdVector>
 //#include <Eigen/Geometry>
 
@@ -10,48 +8,28 @@
 
 using namespace std::chrono_literals;
 
-class gpNode : public rclcpp::Node
-{
-public:
-    gpNode()
-        : Node("gpNode"), count_(0), gq_map_(0.1)
-    {
-        //pub_ = this->create_publisher<octomap_msgs::msg::Octomap>("octomap", 10); // TODO create octree publisher
-        timer_ = this->create_wall_timer(10s, std::bind(&gpNode::timer_callback, this));
-        sub_ = this->create_subscription<octomap_msgs::msg::Octomap>("input_octomap", 10, std::bind(&gpNode::topic_callback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "GP Node Construction done");
-    }
-
-private:
-    void timer_callback()
-    {
-        /*
-        sensor_msgs::msg::PointCoctomap::OcTreeloud2::SharedPtr msg{world_pcl.get_ros_cloud()};
-
-        RCLCPP_INFO(this->get_logger(), "Publish stamp: '%s'", msg->header.stamp);
-        std::flush(std::cout);
-
-        pub_->publish(std::move(*msg));
-        */
-    }
-
-    void topic_callback(const octomap_msgs::msg::Octomap::SharedPtr octomap)
-    {
-        
-    }
-
-    size_t count_;
-    //rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
-    rclcpp::Subscription<octomap_msgs::msg::Octomap>::SharedPtr sub_;
-    rclcpp::TimerBase::SharedPtr timer_;
-    //Eigen::Affine3f prev_Ti_;
-    graspQualityMap gq_map_;
-};
+std::string target_octree_filename = "assets/bt/ENVISAT_midres.bt";
+std::string gripper_octree_filename = "assets/bt/2F85_gripper_midres.bt";
 
 int main(int argc, char **argv)
 {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<gpNode>());
-    rclcpp::shutdown();
+    octomap::OcTree target_tree(target_octree_filename);
+    octomap::OcTree gripper_tree(gripper_octree_filename);
+
+    // xyz min -0.04,0.115,0.085
+    // xyz max 0.04,0.145,0.102
+    octomap::point3d min_point3d{-0.04,0.115,0.085};
+    octomap::point3d max_point3d{0.04,0.145,0.102};
+    
+
+    graspQualityMap gqm(0.001);
+    gqm.set_target_tree(target_tree);
+    gqm.set_gripper_tree(gripper_tree, min_point3d, max_point3d);
+    
+    
+    
+    gqm.get_target_tree()->toColorOcTree().write("outtarget.ot");
+    gqm.get_gripper_tree()->toColorOcTree().write("outgripper.ot");
+
     return 0;
 }

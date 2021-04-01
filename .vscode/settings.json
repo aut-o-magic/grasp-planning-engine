@@ -68,5 +68,6 @@
         "variant": "cpp",
         "*.ipp": "cpp",
         "stdvector": "cpp"
-    }
+    },
+    "cmake.configureOnOpen": false
 }

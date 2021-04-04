@@ -218,21 +218,19 @@ private:
             return normals;
         }
         // loop through normal vector collection and remove repeated entries
+        bool already_exists{false}; // flag to hold whether vector already exists in filtered normals
         for (unsigned int i=0; i < normals.size(); ++i)
         {
             octomath::Vector3 current_vector{normals[i]};
+            
             // check if vector already exists in filtered collection, if not push it there
-            if (filtered_normals.empty()) filtered_normals.push_back(current_vector);
-            else 
+            for (unsigned int j=0; j < filtered_normals.size(); ++j)
             {
-                bool already_exists{false}; // flag to hold whether vector already exists in filtered normals
-                for (unsigned int j=0; j < filtered_normals.size(); ++j)
-                {
-                    if (current_vector.angleTo(filtered_normals[j]) < angle_threshold_same_vector) already_exists = true;
-                }
-                // if vector normal doesnt already exist in filtered collection, push it there
-                if (!already_exists) filtered_normals.push_back(current_vector);
+                if (current_vector.angleTo(filtered_normals[j]) < angle_threshold_same_vector) already_exists = true;
             }
+            // if vector normal doesnt already exist in filtered collection, push it there
+            if (!already_exists) filtered_normals.push_back(current_vector);
+            already_exists = false; // reset flag
         }
         return filtered_normals;
     }

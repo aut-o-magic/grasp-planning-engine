@@ -2,6 +2,7 @@
 #include "octomap_grasping/OcTreeGraspQuality.hpp"
 #include "octomap_grasping/OcTreeGripper.hpp"
 #include <octomap/ColorOcTree.h>
+#include <thread>
 
 // Grasp planning algorithms definitions
 #define GP_ONLYVOXELSUPERIMPOSITION 0 // Simply count the number of voxels within the graspable region that collide with voxels from the target
@@ -93,6 +94,7 @@ public:
      */
     void set_target_tree(const octomap::OcTree& octree)
     {
+        std::cout << "[set_target_tree] started..." << std::endl;
         target_tree_.importOcTree(octree);
     }
 
@@ -113,6 +115,7 @@ public:
      */
     void set_gripper_tree(const octomap::OcTree& octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
     {
+        std::cout << "[set_gripper_tree] started..." << std::endl;
         // TODO try setting import tree resolution to same as this?
         gripper_tree_.importOcTree(octree);
         add_graspable_region(min_BBX, max_BBX);
@@ -140,6 +143,7 @@ public:
      */
     void update_global_grasp_quality(unsigned int algorithm_select = 0)
     {
+        std::cout << "[update_global_grasp_quality] started..." << std::endl;
         float highest_score{0}; // ? Is this the most relevant metric?
         Eigen::Vector3f highest_score_gripper_normal{1,0,0}; // Gripper normal of highest score
         switch(algorithm_select) {
@@ -182,24 +186,6 @@ public:
         std::cout << "Grasp quality score: " << highest_score << ", at " << highest_score_gripper_normal << std::endl;
     }
 
-    // visualiser...
-    // can use castRay to determine distance to closest voxel...
-private:
-    /**
-     * Simple std::out formatter for node occupancy queries
-     * @param query 3D point being queried
-     * @param node corresponding octree node
-     */
-    void print_query_info(octomap::point3d query, octomap::OcTreeNode* node)
-    {
-        if (node) // if not NULL
-        {
-            std::cout << "occupancy probability at " << query << ":\t " << node->getOccupancy() << std::endl;
-        }
-        else 
-            std::cout << "occupancy probability at " << query << ":\t is unknown" << std::endl;    
-    }
-
     /**
      * Compute the surface normals of the octree at the target point
      * @param tree Input OcTree
@@ -233,6 +219,159 @@ private:
             already_exists = false; // reset flag
         }
         return filtered_normals;
+    }
+
+    /**
+     * Grasp visualiser using target and gripper models stored in object
+     * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
+     */
+    octomap::ColorOcTree visualise_grasp() const
+    {
+        return visualise_grasp(this->target_tree_, this->gripper_tree_);
+    }
+
+    /**
+     * Grasp visualiser
+     * @param __target Target octree
+     * @param __gripper Gripper octree
+     * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
+     */
+    octomap::ColorOcTree visualise_grasp(const octomap::OcTreeGraspQuality& __target, const octomap::OcTreeGripper& __gripper) const // TODO Finish function
+    {
+        std::cout << "[visualise_grasp] started..." << std::endl;
+        #define ITERATION_METHOD 0 // 0 = spatial iteration, 1 = octree nodes iteration
+        octomap::ColorOcTree color_tree{std::max(__target.getResolution(),__gripper.getResolution())};
+
+        color_tree.expand(); // ? Necessary? probably not
+
+        // ? Make a study of what is faster, spatial iteration over the BBX or iteration over the nodes?
+        #if ITERATION_METHOD==0
+        // *** Method 1 *** Spatial BBX iteration
+        // set scene BBX
+        double xt, xg, yt, yg, zt, zg;
+        __target.getMetricMax(xt,yt,zt);
+        __gripper.getMetricMax(xg,yg,zg);
+        octomap::point3d max_bbx{std::max(xt,xg), std::max(yt, yg), std::max(zt, zg)};
+        __target.getMetricMin(xt,yt,zt);
+        __gripper.getMetricMin(xg,yg,zg);
+        octomap::point3d min_bbx{std::min(xt,xg), std::min(yt, yg), std::min(zt, zg)};
+        color_tree.setBBXMax(max_bbx);
+        color_tree.setBBXMin(min_bbx);
+
+        // TODO Comment out/remove cout
+        std::cout << "Resolution target: " << __target.getResolution() << ", resolution gripper: " << __gripper.getResolution() << ", color tree resolution: " << color_tree.getResolution() << std::endl;
+        std::cout << "minBBX: " << min_bbx << std::endl;
+        std::cout << "maxBBX: " << max_bbx << std::endl;
+        std::cout << "MetricSize: " << color_tree.getBBXBounds() << std::endl;
+        
+        // set up variables for progress tracking
+        unsigned int total_x_steps{(color_tree.getBBXMax().x() - color_tree.getBBXMin().x()) / color_tree.getResolution()/2};
+        unsigned int current_x_step{0};
+        // Spatially iterate over BBX
+        for (double x = color_tree.getBBXMin().x(); x < color_tree.getBBXMax().x(); x = x + color_tree.getResolution()/2)
+        {
+            for (double y = color_tree.getBBXMin().y(); y < color_tree.getBBXMax().y(); y = y + color_tree.getResolution()/2)
+            {
+                for (double z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + color_tree.getResolution()/2)
+                {
+                    octomap::OcTreeGraspQualityNode* tn = __target.search(x, y, z);
+                    octomap::OcTreeGripperNode* gn = __gripper.search(x, y, z);
+                    octomap::ColorOcTreeNode::Color color{0,0,0};
+
+                    if (!tn && !gn) // if both nodes null, node is free
+                    {
+                        //color_tree.updateNode(x, y, z, false); 
+                    }
+                    else // occupied
+                    {
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(x, y, z, true);
+
+                        if (!tn != !gn) // XOR
+                        {
+                            // node is not occupied by both octrees
+                            if (tn) color.b = 150; // dark blue
+                            else color.b = 255; // light blue
+                        }
+                        else // node occupied by both gripper and target trees
+                        {
+                            if (gn->isGraspingSurface()) color.g = 255;
+                            else color.r = 255;
+                        }
+                        n->setColor(color);
+                    }
+                }
+            }
+
+            // print progess
+            std::cout << '\r' << current_x_step/total_x_steps << "%" << std::flush;
+            current_x_step++;
+        }
+        #endif
+
+        #if ITERATION_METHOD==1
+        // *** Method 2 *** Iterate over both octree nodes
+        // TODO iterate over both octrees separately, editing the same nodes when overlapping
+        
+        #endif
+
+        color_tree.updateInnerOccupancy();
+        return color_tree;
+    }
+
+    // can use castRay to determine distance to closest voxel...
+
+private:
+
+    void yz_plane_iterate()
+    {
+
+    }
+
+    /**
+     * Compute vector with max composite of each coordinate
+     * @param __vector1 First vector
+     * @param __vector2 Second vector
+     * @returns Max composite vector
+     */
+    octomap::point3d max_composite_vector(const octomap::point3d& __vector1, const octomap::point3d& __vector2) const
+    {
+        octomap::point3d output;
+        for (unsigned int i=0; i<3; ++i)
+        {
+            output(i) = std::max(__vector1(i),__vector2(i));
+        }
+        return output;
+    }
+
+    /**
+     * Compute vector with min composite of each coordinate
+     * @param __vector1 First vector
+     * @param __vector2 Second vector
+     * @returns Min composite vector
+     */
+    octomap::point3d min_composite_vector(const octomap::point3d& __vector1, const octomap::point3d& __vector2) const
+    {
+        octomap::point3d output;
+        for (unsigned int i=0; i<3; ++i)
+        {
+            output(i) = std::min(__vector1(i),__vector2(i));
+        }
+        return output;
+    }
+
+    /**
+     * Simple std::out formatter for node occupancy queries
+     * @param query 3D point being queried
+     * @param node corresponding octree node
+     */
+    void print_query_info(octomap::point3d query, octomap::OcTreeNode* node)
+    {
+        if (node) // if not NULL
+        {
+            std::cout << "occupancy probability at " << query << ":\t " << node->getOccupancy() << std::endl;
+        }
+        else 
+            std::cout << "occupancy probability at " << query << ":\t is unknown" << std::endl;    
     }
 
     /**

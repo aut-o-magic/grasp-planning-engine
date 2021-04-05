@@ -28,7 +28,11 @@ int main()
     gqm.set_target_tree(target_tree);
     gqm.set_gripper_tree(gripper_tree, min_point3d, max_point3d);
     
-    gqm.update_global_grasp_quality(0);
+    octomap::ColorOcTree grasp_visualisation{gqm.visualise_grasp()};
+
+    grasp_visualisation.write("grasp_visualisation.ot");
+    
+    //gqm.update_global_grasp_quality(0);
     
     //((octomap::ColorOcTree)*gqm.get_gripper_tree()).write("grippercolor.ot");
     return 0;

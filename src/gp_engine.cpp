@@ -106,9 +106,10 @@ public:
      * Setter for target tree attribute
      * @param octree input octree
      */
-    void set_target_tree(const octomap::OcTreeGraspQuality& octree)
+    void set_target_tree(octomap::OcTreeGraspQuality* octree)
     {
-        target_tree_ = octree;
+        std::cout << "[set_target_tree] started..." << std::endl;
+        target_tree_ = *octree;
     }
 
     /**
@@ -130,9 +131,9 @@ public:
      * Setter for gripper tree attribute
      * @param octree input octree
      */
-    void set_gripper_tree(const octomap::OcTreeGripper& octree)
+    void set_gripper_tree(octomap::OcTreeGripper* octree)
     {
-        gripper_tree_ = octree;
+        gripper_tree_ = *octree;
     }
 
     const octomap::OcTreeGripper* get_gripper_tree() const {return &gripper_tree_;}
@@ -224,6 +225,58 @@ public:
         }
         return filtered_normals;
     }
+
+    /**
+     * Local grasp visualiser showing the region only in the BBX of the gripper octree
+     * @param show_target_voxels Show/hide the target octree voxels
+     * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
+     * TODO Add gripper transformation from origin as param
+     */
+    octomap::ColorOcTree visualise_local_grasp(bool show_target_voxels = true) const
+    {
+        std::cout << "[visualise_local_grasp] started..." << std::endl;
+        octomap::ColorOcTree color_tree{std::min(this->gripper_tree_.getResolution(),this->target_tree_.getResolution())};
+        double x,y,z;
+        this->gripper_tree_.getMetricMax(x,y,z);
+        octomap::point3d max_bbx{(float)x,(float)y,(float)z};
+        this->gripper_tree_.getMetricMin(x,y,z);
+        octomap::point3d min_bbx{(float)x,(float)y,(float)z};
+        color_tree.setBBXMax(max_bbx);
+        color_tree.setBBXMin(min_bbx);
+
+        for (double x = color_tree.getBBXMin().x(); x < color_tree.getBBXMax().x(); x = x + color_tree.getResolution()/2)
+        {
+            for (double y = color_tree.getBBXMin().y(); y < color_tree.getBBXMax().y(); y = y + color_tree.getResolution()/2)
+            {
+                for (double z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + color_tree.getResolution()/2)
+                {
+                    octomap::OcTreeGraspQualityNode* tn = target_tree_.search(x, y, z);
+                    octomap::OcTreeGripperNode* gn = gripper_tree_.search(x, y, z);
+                    octomap::ColorOcTreeNode::Color color{0,0,0};
+                    if (gn) // if gripper node present
+                    {
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(x, y, z, true);
+                        if (tn)
+                        {
+                            if (gn->isGraspingSurface()) color.g = 255;
+                            else color.r = 255;
+                        }
+                        else color.b = 255; // light blue for gripper-only nodes
+                        n->setColor(color);
+                    }
+                    else if (tn && show_target_voxels)
+                    {
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(x, y, z, true);
+                        color.b = 50; // dark blue for target-only nodes
+                        n->setColor(color);
+                    }
+                }
+            }
+        }
+        color_tree.updateInnerOccupancy();
+        return color_tree;
+    }
+
 
     /**
      * Grasp visualiser using target and gripper models stored in object
@@ -466,7 +519,7 @@ private:
                         octomap::OcTreeGripperNode* nn = this->gripper_tree_.updateNode(k, true);
                         nn->setIsGraspingSurface(true);
                     } else { // If node exists
-                        //n->setLogOdds(logodds); // TODO Update to boolean occupancy, not logodds
+                        //n->setLogOdds(logodds); // TODO Check if node is free or occupied, and set it to occupied if not already
                         //octomap::OcTreeGripperNode* nn = gripper_tree_.updateNode(k, logodds);
                         n->setIsGraspingSurface(true);
                     

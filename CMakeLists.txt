@@ -38,6 +38,7 @@ target_include_directories(gp_engine PUBLIC
 target_link_libraries(gp_engine
 ${OCTOMAP_LIBRARIES}
 ${octomap_grasping_LIBRARIES}
+pthread # for std::thread and std::ref
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,

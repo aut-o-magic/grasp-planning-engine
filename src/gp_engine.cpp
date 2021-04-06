@@ -2,7 +2,11 @@
 #include "octomap_grasping/OcTreeGraspQuality.hpp"
 #include "octomap_grasping/OcTreeGripper.hpp"
 #include <octomap/ColorOcTree.h>
-#include <thread>
+#include <thread> // std::thread
+#include <functional> // std::ref
+#include <deque> // std::deque
+#include <condition_variable>
+#include <chrono>
 
 // Grasp planning algorithms definitions
 #define GP_ONLYVOXELSUPERIMPOSITION 0 // Simply count the number of voxels within the graspable region that collide with voxels from the target
@@ -235,14 +239,15 @@ public:
      * @param __target Target octree
      * @param __gripper Gripper octree
      * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
+     * TODO Make multithreaded execution work
      */
-    octomap::ColorOcTree visualise_grasp(const octomap::OcTreeGraspQuality& __target, const octomap::OcTreeGripper& __gripper) const // TODO Finish function
+    octomap::ColorOcTree visualise_grasp(const octomap::OcTreeGraspQuality& __target, const octomap::OcTreeGripper& __gripper) const
     {
         std::cout << "[visualise_grasp] started..." << std::endl;
         #define ITERATION_METHOD 0 // 0 = spatial iteration, 1 = octree nodes iteration
         octomap::ColorOcTree color_tree{std::max(__target.getResolution(),__gripper.getResolution())};
 
-        color_tree.expand(); // ? Necessary? probably not
+        //color_tree.expand(); // ? Necessary? probably not
 
         // ? Make a study of what is faster, spatial iteration over the BBX or iteration over the nodes?
         #if ITERATION_METHOD==0
@@ -251,60 +256,53 @@ public:
         double xt, xg, yt, yg, zt, zg;
         __target.getMetricMax(xt,yt,zt);
         __gripper.getMetricMax(xg,yg,zg);
-        octomap::point3d max_bbx{std::max(xt,xg), std::max(yt, yg), std::max(zt, zg)};
+        octomap::point3d max_bbx{(float)std::max(xt,xg), (float)std::max(yt, yg), (float)std::max(zt, zg)};
         __target.getMetricMin(xt,yt,zt);
         __gripper.getMetricMin(xg,yg,zg);
-        octomap::point3d min_bbx{std::min(xt,xg), std::min(yt, yg), std::min(zt, zg)};
+        octomap::point3d min_bbx{(float)std::min(xt,xg), (float)std::min(yt, yg), (float)std::min(zt, zg)};
         color_tree.setBBXMax(max_bbx);
         color_tree.setBBXMin(min_bbx);
 
-        // TODO Comment out/remove cout
+        // ? Comment out/remove cout
         std::cout << "Resolution target: " << __target.getResolution() << ", resolution gripper: " << __gripper.getResolution() << ", color tree resolution: " << color_tree.getResolution() << std::endl;
         std::cout << "minBBX: " << min_bbx << std::endl;
         std::cout << "maxBBX: " << max_bbx << std::endl;
         std::cout << "MetricSize: " << color_tree.getBBXBounds() << std::endl;
         
+
         // set up variables for progress tracking
-        unsigned int total_x_steps{(color_tree.getBBXMax().x() - color_tree.getBBXMin().x()) / color_tree.getResolution()/2};
+        //unsigned int total_x_steps{(color_tree.getBBXMax().x() - color_tree.getBBXMin().x()) / color_tree.getResolution()/2};
         unsigned int current_x_step{0};
+
+        // variables for multithreading
+        std::deque<std::shared_ptr<std::thread>> active_thread_list{};
+        
         // Spatially iterate over BBX
         for (double x = color_tree.getBBXMin().x(); x < color_tree.getBBXMax().x(); x = x + color_tree.getResolution()/2)
         {
-            for (double y = color_tree.getBBXMin().y(); y < color_tree.getBBXMax().y(); y = y + color_tree.getResolution()/2)
+            // ! Multithreading doesnt work due to access control issues so workers pool kept at 1
+            if (active_thread_list.size() >= 1)//std::thread::hardware_concurrency()) // if all threads assigned, wait for a free one
             {
-                for (double z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + color_tree.getResolution()/2)
-                {
-                    octomap::OcTreeGraspQualityNode* tn = __target.search(x, y, z);
-                    octomap::OcTreeGripperNode* gn = __gripper.search(x, y, z);
-                    octomap::ColorOcTreeNode::Color color{0,0,0};
-
-                    if (!tn && !gn) // if both nodes null, node is free
-                    {
-                        //color_tree.updateNode(x, y, z, false); 
-                    }
-                    else // occupied
-                    {
-                        octomap::ColorOcTreeNode* n = color_tree.updateNode(x, y, z, true);
-
-                        if (!tn != !gn) // XOR
-                        {
-                            // node is not occupied by both octrees
-                            if (tn) color.b = 150; // dark blue
-                            else color.b = 255; // light blue
-                        }
-                        else // node occupied by both gripper and target trees
-                        {
-                            if (gn->isGraspingSurface()) color.g = 255;
-                            else color.r = 255;
-                        }
-                        n->setColor(color);
-                    }
-                }
+                std::shared_ptr<std::thread> th = *active_thread_list.begin();
+                th->join();
+                active_thread_list.pop_front();
             }
+            std::shared_ptr<std::thread> th = std::make_shared<std::thread>(yz_plane_iterate, x, std::ref(color_tree), std::ref(__target), std::ref(__gripper));
 
-            // print progess
-            std::cout << '\r' << current_x_step/total_x_steps << "%" << std::flush;
+            active_thread_list.push_back(th);
+
+            // print progress
+            std::cout << '\r' << current_x_step << "steps" << std::flush;
             current_x_step++;
+        }
+
+        // wait to join and then delete all threads
+        while (!active_thread_list.empty())
+        {
+            std::shared_ptr<std::thread> th = *active_thread_list.begin();
+            th->join();
+            //(*active_thread_list.begin()).join();
+            active_thread_list.pop_front();
         }
         #endif
 
@@ -321,10 +319,47 @@ public:
     // can use castRay to determine distance to closest voxel...
 
 private:
-
-    void yz_plane_iterate()
+    /**
+     * Task definition for visualise_grasp() worker pool
+     * @param x X-axis value of yz iterative plane
+     * @param color_tree modifiable color tree object
+     * @param __target target octree
+     * @param __gripper gripper octree
+     * TODO Implement access control locks to handle multithreaded calls
+     */
+    static void yz_plane_iterate(double x, octomap::ColorOcTree& color_tree, const octomap::OcTreeGraspQuality& __target, const octomap::OcTreeGripper& __gripper) 
     {
+        for (double y = color_tree.getBBXMin().y(); y < color_tree.getBBXMax().y(); y = y + color_tree.getResolution()/2)
+        {
+            for (double z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + color_tree.getResolution()/2)
+            {
+                octomap::OcTreeGraspQualityNode* tn = __target.search(x, y, z);
+                octomap::OcTreeGripperNode* gn = __gripper.search(x, y, z);
+                octomap::ColorOcTreeNode::Color color{0,0,0};
 
+                if (!tn && !gn) // if both nodes null, node is free
+                {
+                    //color_tree.updateNode(x, y, z, false); // ? By understanding unknown state as free, we don't really need to explicitely set to free
+                }
+                else // occupied
+                {
+                    octomap::ColorOcTreeNode* n = color_tree.updateNode(x, y, z, true);
+
+                    if (!tn != !gn) // XOR
+                    {
+                        // node is not occupied by both octrees
+                        if (tn) color.b = 150; // dark blue
+                        else color.b = 255; // light blue
+                    }
+                    else // node occupied by both gripper and target trees
+                    {
+                        if (gn->isGraspingSurface()) color.g = 255;
+                        else color.r = 255;
+                    }
+                    n->setColor(color);
+                }
+            }
+        }
     }
 
     /**

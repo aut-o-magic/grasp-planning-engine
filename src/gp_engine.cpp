@@ -151,11 +151,16 @@ public:
         std::cout << "[update_global_grasp_quality] started..." << std::endl;
         float highest_score{0}; // ? Is this the most relevant metric?
         Eigen::Vector3f highest_score_gripper_normal{1,0,0}; // Gripper normal of highest score
+
+        // expand target_tree for complete analysis
+        target_tree_.expand();
+
+        // grasp planning algorithm select
         switch(algorithm_select) {
             case GP_ONLYVOXELSUPERIMPOSITION:
                 std::cout << "ONLYVOXELSUPERIMPOSITION SELECTED" << std::endl; // ! DEBUG Call
-                
-                for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_.begin_leafs(), end=target_tree_.end_leafs(); it!= end; ++it)
+
+                for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_.begin_leafs(), end=target_tree_.end_leafs(); it!= end; ++it) // ? Start at the back to avoid solar panels at the beginning?
                 {
                     // * Step 1: Get surface normals
                     octomap::point3d_collection normals;
@@ -168,6 +173,9 @@ public:
                     octomap::point3d normal_gripper{0,1,0}; // gripping normal is positive y-axis
                     TF.translation() = coordinates_node;
 
+
+                    // Analyse surface normals collection
+                    /*
                     std::cout << "Surface normals:" << std::endl;
                     for (unsigned int i = 0; i < normals.size(); i++)
                     {
@@ -187,7 +195,6 @@ public:
 
                         // Visualise grasp attempt
                         //visualise_local_grasp(true, TF).write("local_grasp_visual.ot"); // show target voxels
-
                         visualise_grasp(TF).write("global_grasp_visual.ot");
                         
                         do 
@@ -195,7 +202,7 @@ public:
                             std::cout << '\n' << "Press a key to continue...";
                         } while (std::cin.get() != '\n');
                     }
-
+                    */
 
                     // TODO continue here...
                     /*
@@ -210,7 +217,7 @@ public:
                     //highest_score = gp_voxelsuperimposition();
                     */
                 }
-                
+
                 break;
             case GP_ONLYSURFACENORMALS:
                 highest_score = gp_surfacenormals();
@@ -223,6 +230,49 @@ public:
                 return;
         }
         std::cout << "Grasp quality score: " << highest_score << ", at " << highest_score_gripper_normal << std::endl;
+    }
+
+    /**
+     * Visualise surface normals density of target tree using filtered marching cubes surface reconstruction algorithm.
+     * Density color coding: white = 0, red = 1, green = 2, blue = 3, black => 4
+     */
+    void visualise_surface_normals_density()
+    {
+        std::cout << "[visualise_surface_normals_density] started..." << std::endl;
+        octomap::ColorOcTree color_tree_normals_density{this->target_tree_.getResolution()};
+        unsigned int normal0{0};
+        unsigned int normal1{0};
+        unsigned int normal2{0};
+        unsigned int normal3{0};
+        unsigned int normal3plus{0};
+
+        // expand target_tree for complete analysis
+        target_tree_.expand();
+
+        for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_.begin_leafs(), end=target_tree_.end_leafs(); it!= end; ++it) // ? Start at the back to avoid solar panels at the beginning?
+        {
+            octomap::point3d_collection normals;
+            //print_query_info(it.getCoordinate(), &(*it));
+            normals = get_surface_normals(target_tree_, it.getCoordinate());
+
+            // Populate color_tree_normals_density object
+            octomap::ColorOcTreeNode* snn = color_tree_normals_density.updateNode(it.getCoordinate(), true);
+            octomap::ColorOcTreeNode::Color color{0,0,0};
+            // white = 0, red = 1, green = 2, blue = 3, black => 4
+            if (normals.size() == 0) {normal0++;}
+            else if (normals.size() == 1) {color.r = 255; normal1++;}
+            else if (normals.size() == 2) {color.g = 255; normal2++;}
+            else if (normals.size() == 3) {color.b = 255; normal3++;}
+            else {color = octomap::ColorOcTreeNode::Color{255, 255, 255}; normal3plus++;}
+            uint8_t r = std::max((unsigned long)0, 255-(normals.size()*51));
+            uint8_t g = std::min((unsigned long)255, 0+(normals.size()*51));
+            snn->setColor(r,g,0);
+        }
+
+        color_tree_normals_density.updateInnerOccupancy();
+
+        std::cout << "[Surface normals density study]:" << std::endl << "Size collection: [0]=" << normal0 << " [1]=" << normal1 << " [2]=" << normal2 << " [3]=" << normal3 << " [3+]=" << normal3plus << std::endl;
+        color_tree_normals_density.write("color_tree_normals_density.ot");
     }
 
     /**

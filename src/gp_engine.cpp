@@ -233,6 +233,74 @@ public:
     }
 
     /**
+     * Local grasp visualiser showing the region only in the BBX of the gripper octree
+     * @param show_target_voxels Show/hide the target octree voxels
+     * @param T homogenous transformation from origin to gripper grasping pose
+     * @param BBX_margin Add additional margins to the BBX drawn for better occupancy context
+     * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
+     */
+    octomap::ColorOcTree visualise_local_grasp(bool show_target_voxels = false, const Eigen::Affine3f& T = Eigen::Affine3f::Identity(), float BBX_margin = 0) const
+    {
+        std::cout << "[visualise_local_grasp] started..." << std::endl;
+        octomap::ColorOcTree color_tree{std::min(this->gripper_tree_.getResolution(),this->target_tree_.getResolution())};
+        double x,y,z;
+        this->gripper_tree_.getMetricMax(x,y,z);
+        x += BBX_margin;
+        y += BBX_margin;
+        z += BBX_margin;
+        octomap::point3d max_bbx{(float)x,(float)y,(float)z};
+        this->gripper_tree_.getMetricMin(x,y,z);
+        octomap::point3d min_bbx{(float)x,(float)y,(float)z};
+        x -= BBX_margin;
+        y -= BBX_margin;
+        z -= BBX_margin;
+        color_tree.setBBXMax(max_bbx);
+        color_tree.setBBXMin(min_bbx);
+
+        for (double x = color_tree.getBBXMin().x(); x < color_tree.getBBXMax().x(); x = x + color_tree.getResolution()/2)
+        {
+            for (double y = color_tree.getBBXMin().y(); y < color_tree.getBBXMax().y(); y = y + color_tree.getResolution()/2)
+            {
+                for (double z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + color_tree.getResolution()/2)
+                {
+                    // transform coordinates according to T
+                    Eigen::Vector3f coord_g{x,y,z};
+                    octomap::point3d gripper3d{x,y,z};
+                    Eigen::Vector3f coord_w{T * coord_g};
+                    octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
+
+                    // search for corresponding nodes in octrees
+                    octomap::OcTreeGripperNode* gn = gripper_tree_.search(coord_g.x(), coord_g.y(), coord_g.z());
+                    octomap::OcTreeGraspQualityNode* tn = target_tree_.search(world3d);
+
+                    // colorise nodes
+                    octomap::ColorOcTreeNode::Color color{0,0,0};
+                    if (gn) // if gripper node present
+                    {
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, true);
+                        if (tn)
+                        {
+                            if (gn->isGraspingSurface()) color.g = 255;
+                            else color.r = 255;
+                        }
+                        else color.b = 255; // light blue for gripper-only nodes
+                        n->setColor(color);
+                    }
+                    else if (tn && show_target_voxels)
+                    {
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, true);
+                        color.b = 50; // dark blue for target-only nodes
+                        n->setColor(color);
+                    }
+                }
+            }
+        }
+        color_tree.updateInnerOccupancy();
+        return color_tree;
+    }
+
+    // *** VISUALISATION METHODS ***S
+    /**
      * Visualise surface normals density of target tree using filtered marching cubes surface reconstruction algorithm.
      * Density color coding: white = 0, red = 1, green = 2, blue = 3, black => 4
      */
@@ -309,74 +377,6 @@ public:
         }
         return filtered_normals;
     }
-
-    /**
-     * Local grasp visualiser showing the region only in the BBX of the gripper octree
-     * @param show_target_voxels Show/hide the target octree voxels
-     * @param T homogenous transformation from origin to gripper grasping pose
-     * @param BBX_margin Add additional margins to the BBX drawn for better occupancy context
-     * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
-     */
-    octomap::ColorOcTree visualise_local_grasp(bool show_target_voxels = false, const Eigen::Affine3f& T = Eigen::Affine3f::Identity(), float BBX_margin = 0) const
-    {
-        std::cout << "[visualise_local_grasp] started..." << std::endl;
-        octomap::ColorOcTree color_tree{std::min(this->gripper_tree_.getResolution(),this->target_tree_.getResolution())};
-        double x,y,z;
-        this->gripper_tree_.getMetricMax(x,y,z);
-        x += BBX_margin;
-        y += BBX_margin;
-        z += BBX_margin;
-        octomap::point3d max_bbx{(float)x,(float)y,(float)z};
-        this->gripper_tree_.getMetricMin(x,y,z);
-        octomap::point3d min_bbx{(float)x,(float)y,(float)z};
-        x -= BBX_margin;
-        y -= BBX_margin;
-        z -= BBX_margin;
-        color_tree.setBBXMax(max_bbx);
-        color_tree.setBBXMin(min_bbx);
-
-        for (double x = color_tree.getBBXMin().x(); x < color_tree.getBBXMax().x(); x = x + color_tree.getResolution()/2)
-        {
-            for (double y = color_tree.getBBXMin().y(); y < color_tree.getBBXMax().y(); y = y + color_tree.getResolution()/2)
-            {
-                for (double z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + color_tree.getResolution()/2)
-                {
-                    // transform coordinates according to T
-                    Eigen::Vector3f coord_g{x,y,z};
-                    octomap::point3d gripper3d{x,y,z};
-                    Eigen::Vector3f coord_w{T * coord_g};
-                    octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
-
-                    // search for corresponding nodes in octrees
-                    octomap::OcTreeGripperNode* gn = gripper_tree_.search(coord_g.x(), coord_g.y(), coord_g.z());
-                    octomap::OcTreeGraspQualityNode* tn = target_tree_.search(world3d);
-
-                    // colorise nodes
-                    octomap::ColorOcTreeNode::Color color{0,0,0};
-                    if (gn) // if gripper node present
-                    {
-                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, true);
-                        if (tn)
-                        {
-                            if (gn->isGraspingSurface()) color.g = 255;
-                            else color.r = 255;
-                        }
-                        else color.b = 255; // light blue for gripper-only nodes
-                        n->setColor(color);
-                    }
-                    else if (tn && show_target_voxels)
-                    {
-                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, true);
-                        color.b = 50; // dark blue for target-only nodes
-                        n->setColor(color);
-                    }
-                }
-            }
-        }
-        color_tree.updateInnerOccupancy();
-        return color_tree;
-    }
-
 
     /**
      * Grasp visualiser using target and gripper models stored in object
@@ -463,7 +463,7 @@ public:
 
         #if ITERATION_METHOD==1
         // *** Method 2 *** Iterate over both octree nodes
-        // TODO iterate over both octrees separately, editing the same nodes when overlapping
+        // TODO iterate over both octrees separately, editing the same nodes when overlapping. This will probably be so much faster
         
         #endif
 

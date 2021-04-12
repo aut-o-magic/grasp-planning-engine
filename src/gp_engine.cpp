@@ -132,10 +132,9 @@ public:
     void set_gripper_tree(octomap::OcTree* octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
-        // TODO try setting import tree resolution to same as this?
+        // TODO try setting import tree resolution to same as *this?
         gripper_tree_.importOcTree(*octree);
         add_graspable_region(min_BBX, max_BBX);
-        //add_graspable_region(min_BBX.z(), max_BBX.z() ,min_BBX.y() ,max_BBX.y() ,min_BBX.x() ,max_BBX.x());
     }
 
     /**
@@ -491,7 +490,6 @@ public:
 
         //color_tree.expand(); // ? Necessary? probably not
 
-        // ? Make a study of what is faster, spatial iteration over the BBX or iteration over the nodes?
         #if ITERATION_METHOD==0
         // *** Method 0 *** Spatial BBX iteration
         // set scene BBX
@@ -743,7 +741,6 @@ private:
      */
     void add_graspable_region(const octomap::point3d& min, const octomap::point3d& max)
     {
-        //float logodds = gripper_tree_.getClampingThresMaxLog() - gripper_tree_.getClampingThresMinLog(); // TODO check if this can be deleted
         octomap::OcTreeKey minKey(0,0,0);
         octomap::OcTreeKey maxKey(0,0,0);
         gripper_tree_.coordToKeyChecked(min, minKey);
@@ -758,11 +755,13 @@ private:
                     {
                         octomap::OcTreeGripperNode* nn = this->gripper_tree_.updateNode(k, true);
                         nn->setIsGraspingSurface(true);
-                    } else { // If node exists
-                        //n->setLogOdds(logodds); // TODO Check if node is free or occupied, and set it to occupied if not already
-                        //octomap::OcTreeGripperNode* nn = gripper_tree_.updateNode(k, logodds);
+                    } 
+                    else // If node exists
+                    {
+                        // TODO Check this updates node at lowest depth level
+                        if (n->getOccupancy() < 0.5) // if node is free
+                            n->setLogOdds(this->gripper_tree_.getProbHitLog());
                         n->setIsGraspingSurface(true);
-                    
                     }
                 }
             }

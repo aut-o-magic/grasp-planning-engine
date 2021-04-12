@@ -107,10 +107,10 @@ public:
      * Setter for target tree attribute. Be sure to run update_global_grasp_quality() to determine the grasp quality of the target
      * @param octree input octree
      */
-    void set_target_tree(const octomap::OcTree& octree)
+    void set_target_tree(octomap::OcTree* octree)
     {
         std::cout << "[set_target_tree] started..." << std::endl;
-        target_tree_.importOcTree(octree);
+        target_tree_.importOcTree(*octree);
     }
 
     /**
@@ -129,11 +129,11 @@ public:
      * @param min_BBX minimum coordinate of BBX in meters
      * @param max_BBX maximum coordinate of BBX in meters
      */
-    void set_gripper_tree(const octomap::OcTree& octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
+    void set_gripper_tree(octomap::OcTree* octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
         // TODO try setting import tree resolution to same as this?
-        gripper_tree_.importOcTree(octree);
+        gripper_tree_.importOcTree(*octree);
         add_graspable_region(min_BBX, max_BBX);
         //add_graspable_region(min_BBX.z(), max_BBX.z() ,min_BBX.y() ,max_BBX.y() ,min_BBX.x() ,max_BBX.x());
     }
@@ -142,9 +142,11 @@ public:
      * Setter for gripper tree attribute
      * @param octree input octree
      */
-    void set_gripper_tree(octomap::OcTreeGripper* octree)
+    void set_gripper_tree(octomap::OcTreeGripper* octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
     {
+        std::cout << "[set_gripper_tree] started..." << std::endl;
         gripper_tree_ = *octree;
+        add_graspable_region(min_BBX, max_BBX);
     }
 
     const octomap::OcTreeGripper* get_gripper_tree() const {return &gripper_tree_;}

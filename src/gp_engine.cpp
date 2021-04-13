@@ -510,7 +510,7 @@ public:
     }
 
     /**
-     * Grasp visualiser using target and gripper models stored in object
+     * Grasp visualiser using target and gripper models stored in object, origin set to gripper
      * @param T homogenous transformation from origin to gripper grasping pose
      * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
      * TODO Make multithreaded search execution in method 0 work
@@ -520,6 +520,7 @@ public:
         std::cout << "[visualise_global_grasp] started..." << std::endl;
         #define ITERATION_METHOD 1 // 0 = spatial iteration, 1 = octree nodes iteration
         octomap::ColorOcTree color_tree{std::max(target_tree_.getResolution(),gripper_tree_.getResolution())};
+        octomap::point3d origin_offset{T.translation().x(), T.translation().y(), T.translation().z()}; // origin of color_tree will be offset by this amount to focus on gripper
 
         #if ITERATION_METHOD==0
         // *** Method 0 *** Spatial BBX iteration
@@ -566,7 +567,7 @@ public:
                     octomap::ColorOcTreeNode::Color color{0,0,0};
                     if (!tn && !gn) // if both nodes null, node is free
                     {
-                        //color_tree.updateNode(x, y, z, false); // ? By understanding unknown state as free, we don't really need to explicitely set to free
+                        //color_tree.updateNode(world3d, false); // ? By understanding unknown state as free, we don't really need to explicitely set to free
                     }
                     else // occupied
                     {
@@ -643,13 +644,45 @@ public:
         }
         #endif
         color_tree.updateInnerOccupancy();
-        //color_tree.prune();
-        return color_tree;
+
+        return translated_ColorOcTree(color_tree, origin_offset);
     }
 
     // can use castRay to determine distance to closest voxel...
 
 private:
+    /**
+     * Translated copy of the origin of a color octree
+     * @param tree Original color octree ptr
+     * @param translation Linear translation vector to new origin
+     * @returns New color octree with translated origin
+     */
+    octomap::ColorOcTree translated_ColorOcTree(octomap::ColorOcTree& tree, const octomap::point3d& translation)
+    {
+        tree.expand();
+        
+        // match translation to resolution steps
+        float res{(float)tree.getResolution()};
+        float x{std::round(translation.x()/res)*res};
+        float y{std::round(translation.y()/res)*res};
+        float z{std::round(translation.z()/res)*res};
+        octomap::point3d matched_translation{x,y,z};
+
+        // new octree
+        octomap::ColorOcTree new_tree{tree.getResolution()};
+
+        // iterate over current tree and copy transformed nodes to new tree
+        for (octomap::ColorOcTree::leaf_iterator it = tree.begin_leafs(), end=tree.end_leafs(); it!= end; ++it)
+        {
+            octomap::point3d coord{it.getCoordinate() - matched_translation};
+            octomap::ColorOcTreeNode* n = new_tree.updateNode(coord, it->getLogOdds());
+            n->setColor(it->getColor());
+
+        }
+        new_tree.updateInnerOccupancy();
+        return new_tree;
+    }
+
     /**
      * Compute vector with max composite of each coordinate
      * @param __vector1 First vector
@@ -786,8 +819,6 @@ private:
             }
         }
         octomap::point3d center_bbx{(max-min)*0.5 + min};
-        std::cout << "min" << min << std::endl << "max" << max << std::endl;
-        std::cout << "[add_graspable_region] center of graspable region is at: " << center_bbx << std::endl;
         return center_bbx;
     }
 

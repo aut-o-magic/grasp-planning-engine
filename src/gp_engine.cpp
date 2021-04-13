@@ -656,6 +656,7 @@ private:
      * @param tree Original color octree ptr
      * @param translation Linear translation vector to new origin
      * @returns New color octree with translated origin
+     * ? Could be made to also rotate the octree but that seems unnecessary
      */
     octomap::ColorOcTree translated_ColorOcTree(octomap::ColorOcTree& tree, const octomap::point3d& translation)
     {

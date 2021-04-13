@@ -27,7 +27,7 @@ inline void pause()
 class graspQualityMap
 {
 public:
-    graspQualityMap(const double resolution=0.1) : sensor_origin_{0,0,0}, target_tree_{resolution}, gripper_tree_{resolution} 
+    graspQualityMap(const double resolution=0.1) : sensor_origin_{0,0,0}, target_tree_{resolution}, gripper_tree_{resolution}, normal_gripper_{0,1,0}
     {
 
     }
@@ -126,26 +126,57 @@ public:
     /**
      * Setter for gripper tree attribute and draw graspable bounding box (BBX)
      * @param octree input octree
+     * @param gripper_normal Normal vector of the gripper towards the target surface
+     */
+    void set_gripper_tree(octomap::OcTree* octree, const octomap::point3d& gripper_normal)
+    {
+        std::cout << "[set_gripper_tree] started..." << std::endl;
+        gripper_tree_.importOcTree(*octree);
+        this->normal_gripper_ = gripper_normal;
+    }    
+
+    /**
+     * Setter for gripper tree attribute and draw graspable bounding box (BBX)
+     * @param octree input octree
+     * @param gripper_normal Normal vector of the gripper towards the target surface
      * @param min_BBX minimum coordinate of BBX in meters
      * @param max_BBX maximum coordinate of BBX in meters
      */
-    void set_gripper_tree(octomap::OcTree* octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
+    void set_gripper_tree(octomap::OcTree* octree, const octomap::point3d& gripper_normal, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
-        // TODO try setting import tree resolution to same as *this?
         gripper_tree_.importOcTree(*octree);
-        add_graspable_region(min_BBX, max_BBX);
+        this->normal_gripper_ = gripper_normal;
+        octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
+        this->gripper_tree_.setOrigin(grasp_center_point);
     }
 
     /**
-     * Setter for gripper tree attribute
-     * @param octree input octree
+     * Setter for gripper tree attribute and draw graspable bounding box (BBX)
+     * @param octree input gripper octree
+     * @param gripper_normal Normal vector of the gripper towards the target surface
      */
-    void set_gripper_tree(octomap::OcTreeGripper* octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
+    void set_gripper_tree(octomap::OcTreeGripper* octree, const octomap::point3d& gripper_normal)
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
         gripper_tree_ = *octree;
-        add_graspable_region(min_BBX, max_BBX);
+        this->normal_gripper_ = gripper_normal;
+    }
+
+    /**
+     * Setter for gripper tree attribute and draw graspable bounding box (BBX)
+     * @param octree input gripper octree
+     * @param gripper_normal Normal vector of the gripper towards the target surface
+     * @param min_BBX minimum coordinate of BBX in meters
+     * @param max_BBX maximum coordinate of BBX in meters
+     */
+    void set_gripper_tree(octomap::OcTreeGripper* octree, const octomap::point3d& gripper_normal, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
+    {
+        std::cout << "[set_gripper_tree] started..." << std::endl;
+        gripper_tree_ = *octree;
+        this->normal_gripper_ = gripper_normal;
+        octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
+        this->gripper_tree_.setOrigin(grasp_center_point);
     }
 
     const octomap::OcTreeGripper* get_gripper_tree() const {return &gripper_tree_;}
@@ -183,7 +214,7 @@ public:
                     // * Step 2: Find best surface normal candidate
                     Eigen::Affine3f TF{Eigen::Affine3f::Identity()};
                     Eigen::Vector3f coordinates_node{it.getCoordinate().x(), it.getCoordinate().y(), it.getCoordinate().z()};
-                    octomap::point3d normal_gripper{0,1,0}; // gripping normal is positive y-axis
+                    //octomap::point3d normal_gripper{0,1,0}; // Set as class attribute
                     TF.translation() = coordinates_node;
 
 
@@ -197,8 +228,8 @@ public:
                         std::cout << normal_node << std::endl;
 
                         // Compute gripper transformation
-                        float rot_angle{(float)normal_gripper.angleTo(normal_node.normalized())};
-                        octomap::point3d rot_axis{normal_gripper.cross(normal_node.normalized())};
+                        float rot_angle{(float)normal_gripper_.angleTo(normal_node.normalized())};
+                        octomap::point3d rot_axis{normal_gripper_.cross(normal_node.normalized())};
                         Eigen::Vector3f euler_rot_axis{rot_axis.x(), rot_axis.y(), rot_axis.z()};
                         Eigen::AngleAxisf rotation{rot_angle, euler_rot_axis};
                         TF.linear() = rotation.toRotationMatrix(); // rotation component is called "linear part" in Eigen library https://eigen.tuxfamily.org/dox/classEigen_1_1Transform.html
@@ -215,9 +246,11 @@ public:
                         }
 
                         // Visualise grasp attempt
-                        #if 0
-                        visualise_local_grasp(false, TF).write("local_grasp_visual.ot"); // show target voxels
-                        visualise_grasp(TF);//.write("global_grasp_visual.ot");
+                        #if 1
+                        std::cout << "Score: " << score << std::endl;
+                        std::cout << "Normal: " << normal_node << std::endl;
+                        visualise_local_grasp(false, TF).write("local_grasp_visual.ot");
+                        visualise_global_grasp(TF).write("global_grasp_visual.ot");
                         pause();
                         #endif
                     }
@@ -482,9 +515,9 @@ public:
      * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
      * TODO Make multithreaded search execution in method 0 work
      */
-    octomap::ColorOcTree visualise_grasp(const Eigen::Affine3f& T = Eigen::Affine3f::Identity())
+    octomap::ColorOcTree visualise_global_grasp(const Eigen::Affine3f& T = Eigen::Affine3f::Identity())
     {
-        std::cout << "[visualise_grasp] started..." << std::endl;
+        std::cout << "[visualise_global_grasp] started..." << std::endl;
         #define ITERATION_METHOD 1 // 0 = spatial iteration, 1 = octree nodes iteration
         octomap::ColorOcTree color_tree{std::max(target_tree_.getResolution(),gripper_tree_.getResolution())};
 
@@ -691,6 +724,8 @@ private:
         float reward{1}; // reward for positive node interaction
         float penalty{1}; // penalty for negative node interaction
 
+        gripper_tree_.expand(); // expand to standardise the size of all voxels in score counting
+
         for (octomap::OcTreeGripper::leaf_iterator it = gripper_tree_.begin_leafs(), end=gripper_tree_.end_leafs(); it!= end; ++it)
         {
             octomap::point3d coord{it.getCoordinate()};
@@ -738,8 +773,9 @@ private:
      * Adds a graspable region of gripper octree as BBX (Bounding Box)
      * @param min minimum corner coordinate of bounding box in meters
      * @param max maximum corner coordinate of bounding box in meters
+     * @returns center of newly added graspable region
      */
-    void add_graspable_region(const octomap::point3d& min, const octomap::point3d& max)
+    octomap::point3d add_graspable_region(const octomap::point3d& min, const octomap::point3d& max)
     {
         octomap::OcTreeKey minKey(0,0,0);
         octomap::OcTreeKey maxKey(0,0,0);
@@ -766,9 +802,14 @@ private:
                 }
             }
         }
+        octomap::point3d center_bbx{(max-min)*0.5 + min};
+        std::cout << "min" << min << std::endl << "max" << max << std::endl;
+        std::cout << "[add_graspable_region] center of graspable region is at: " << center_bbx << std::endl;
+        return center_bbx;
     }
 
     octomap::point3d sensor_origin_;
     octomap::OcTreeGraspQuality target_tree_;
     octomap::OcTreeGripper gripper_tree_;
+    octomap::point3d normal_gripper_;
 };

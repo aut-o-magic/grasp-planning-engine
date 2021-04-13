@@ -521,8 +521,6 @@ public:
         #define ITERATION_METHOD 1 // 0 = spatial iteration, 1 = octree nodes iteration
         octomap::ColorOcTree color_tree{std::max(target_tree_.getResolution(),gripper_tree_.getResolution())};
 
-        //color_tree.expand(); // ? Necessary? probably not
-
         #if ITERATION_METHOD==0
         // *** Method 0 *** Spatial BBX iteration
         // set scene BBX
@@ -652,21 +650,6 @@ public:
     // can use castRay to determine distance to closest voxel...
 
 private:
-    /**
-     * Task definition for octree search using threaded workers
-     * @param octree Octree
-     * @param x x-coordiante
-     * @param y y-coordinate
-     * @param z z-coordinate
-     * @param n octree node pointer found
-     * ! Still not used/working
-     */
-    template<typename NODE>
-    static void threaded_octree_search(const octomap::OccupancyOcTreeBase<NODE>& tree, double x, double y, double z, NODE& n) 
-    {
-        n = tree.search(x, y, z);
-    }
-
     /**
      * Compute vector with max composite of each coordinate
      * @param __vector1 First vector

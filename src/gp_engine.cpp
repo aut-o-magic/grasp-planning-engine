@@ -210,6 +210,7 @@ public:
                     octomap::point3d_collection normals;
                     //print_query_info(it.getCoordinate(), &(*it));
                     normals = get_surface_normals(target_tree_, it.getCoordinate());
+                    if (normals.empty()) continue; // if there is no normal to the surface, skip this node
 
                     // * Step 2: Find best surface normal candidate
                     Eigen::Affine3f TF{Eigen::Affine3f::Identity()};
@@ -221,8 +222,9 @@ public:
                     // Analyse surface normals collection
                     float best_score{-999999}; // TODO Set to a meaninful number
                     octomap::point3d best_normal{};
+                    Eigen::Matrix3f best_rotM{};
                     std::cout << "Surface normals:" << std::endl;
-                    for (unsigned int i = 0; i < normals.size(); i++)
+                    for (unsigned int i = 0; i < normals.size(); i++) // TODO analyse whether this loop should be executed for every discretised rotation of the gripper
                     {
                         octomap::point3d normal_node{normals[i]};
                         std::cout << normal_node << std::endl;
@@ -230,8 +232,8 @@ public:
                         // Compute gripper transformation
                         float rot_angle{(float)normal_gripper_.angleTo(normal_node.normalized())};
                         octomap::point3d rot_axis{normal_gripper_.cross(normal_node.normalized())};
-                        Eigen::Vector3f euler_rot_axis{rot_axis.x(), rot_axis.y(), rot_axis.z()};
-                        Eigen::AngleAxisf rotation{rot_angle, euler_rot_axis};
+                        Eigen::Vector3f eigen_rot_axis{rot_axis.x(), rot_axis.y(), rot_axis.z()};
+                        Eigen::AngleAxisf rotation{rot_angle, eigen_rot_axis};
                         TF.linear() = rotation.toRotationMatrix(); // rotation component is called "linear part" in Eigen library https://eigen.tuxfamily.org/dox/classEigen_1_1Transform.html
 
                         // Calculate grasp quality
@@ -243,25 +245,38 @@ public:
                         {
                             best_score = score;
                             best_normal = normal_node;
+                            best_rotM = TF.rotation();
                         }
 
                         // Visualise grasp attempt
-                        #if 1
-                        std::cout << "Score: " << score << std::endl;
-                        std::cout << "Normal: " << normal_node << std::endl;
-                        visualise_local_grasp(false, TF).write("local_grasp_visual.ot");
-                        visualise_global_grasp(TF).write("global_grasp_visual.ot");
-                        pause();
+                        #if 0
+                        std::cout << "Score: \t" << score << std::endl;
+                        std::cout << "Normal: \t" << normal_node << std::endl;
+                        write_grasp_visualisations(TF);
                         #endif
                     }
+                    // Set best transformation
+                    TF.linear() = best_rotM;
+                    const Eigen::Vector3f surface_normal{best_normal.x(), best_normal.y(), best_normal.z()};
+                    const Eigen::Affine3f T0{TF};
 
                     // * Step 3: Rotate the gripper over all the orientations and store gq in target octree
-                    // TODO continue here...
-                    /*
+                    octomap::OcTreeGraspQualityNode::GraspQuality gq{it->getGraspQuality()};
+                    Eigen::Vector3f grasp_normal{best_normal.x(), best_normal.y(), best_normal.z()};
+                    gq.normal = grasp_normal;
 
-                    //it->setGraspQuality()
-                    //highest_score = gp_voxelsuperimposition();
-                    */
+                    for (unsigned int i=0; i<gq.angle_quality.row(0).size(); ++i)
+                    {
+                        Eigen::Affine3f Ti{T0};
+                        float angle{gq.angle_quality.row(0)(i)};
+                        Eigen::AngleAxisf rot{angle, surface_normal}; // rotate along the 
+                        Ti.rotate(rot);
+
+                        //write_grasp_visualisations(Ti);
+
+                        float score = gp_voxelsuperimposition(Ti);
+                        gq.angle_quality.row(1)(i) = score; // TODO convert score to normalised scale (0 to 1?)
+                    }
                 }
 
                 break;
@@ -729,6 +744,17 @@ private:
         }
         else 
             std::cout << "occupancy probability at " << query << ":\t is unknown" << std::endl;    
+    }
+
+    /**
+     * Convenience function for writing both local and global grasp visualisations to file
+     * @param TF Gripper affine transformation matrix
+     */
+    void write_grasp_visualisations(const Eigen::Affine3f& TF)
+    {
+        visualise_local_grasp(false, TF).write("local_grasp_visual.ot");
+        visualise_global_grasp(TF).write("global_grasp_visual.ot");
+        pause();
     }
 
     /**

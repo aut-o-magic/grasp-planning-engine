@@ -195,24 +195,30 @@ public:
     {
         std::cout << "[update_global_grasp_quality] started..." << std::endl;
         auto start = std::chrono::high_resolution_clock::now();
+        float (*gq_function)(const Eigen::Affine3f &T, const octomap::OcTreeGraspQuality *target_tree_, octomap::OcTreeGripper *gripper_tree_); // Grasp Quality function handle
         // grasp planning algorithm select
-        switch(algorithm_select) { // TODO make this select gp algorithm to use
+
+        switch(algorithm_select) {
             case GP_ONLYVOXELSUPERIMPOSITION:
             {
                 std::cout << "ONLYVOXELSUPERIMPOSITION SELECTED" << std::endl;
+                gq_function = GraspQualityMethods::gq_voxelsuperimposition;
                 break;
             }
             case GP_ONLYSURFACENORMALS:
-                //highest_score = gp_surfacenormals();
+                std::cout << "ONLYSURFACENORMALS SELECTED" << std::endl;
+                gq_function = GraspQualityMethods::gq_surfacenormals;
                 break;
             case GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS:
-                //highest_score = gp_voxelsuperimposition_surfacenormals();
+                std::cout << "VOXELSUPERIMPOSITIONANDSURFACENORMALS SELECTED" << std::endl;
+                gq_function = GraspQualityMethods::gq_voxelsuperimposition_surfacenormals;
                 break;
             case GP_RAYCASTINGANTIPODALPLANES:
-                // TODO
+                std::cout << "RAYCASTINGANTIPODALPLANES SELECTED" << std::endl;
+                gq_function = GraspQualityMethods::gq_raycasting;
                 break;
             default:
-                std::cerr << "Invalid grasp planning algorithm selected" << std::endl;
+                std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;
                 return;
         }
         
@@ -232,7 +238,7 @@ public:
             std::cout << "Current node: " << current_node << std::endl;
 
             // Dispatch threaded worker to analyse node
-            octomap::OcTreeGraspQualityNode::GraspQuality gq{node_gq_analysis(it_node)};
+            octomap::OcTreeGraspQualityNode::GraspQuality gq{node_gq_analysis(it_node, gq_function)};
 
             // Write to node
             it_node->setGraspQuality(gq);
@@ -254,7 +260,7 @@ public:
      * @returns Collection of surface normals normalised vectors
      */
     template<typename NODE>
-    octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d)
+    octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d) const
     {
         const double angle_threshold_same_vector = 0.01; // rad (0.01rad = 0.573deg)
         octomap::point3d_collection normals;
@@ -288,9 +294,11 @@ private:
     /**
      * Grasp quality analysis worker
      * @param it Target node iterator
+     * @param gq_virtual Grasp quality method to use
      * @returns GraspQuality object for the node
      */
-    octomap::OcTreeGraspQualityNode::GraspQuality node_gq_analysis(const octomap::OcTreeGraspQuality::iterator& it_node)
+    template<typename gq_method>
+    octomap::OcTreeGraspQualityNode::GraspQuality node_gq_analysis(const octomap::OcTreeGraspQuality::iterator& it_node, gq_method gq_virtual)
     {
         octomap::OcTreeGraspQualityNode::GraspQuality gq{it_node->getGraspQuality()};
 
@@ -326,10 +334,10 @@ private:
                 Eigen::AngleAxisf rot{angle, norm_eigen}; // rotate around pointing vector axis
                 Ti.rotate(rot);
 
-                write_grasp_visualisations(Ti);
+                //write_grasp_visualisations(Ti);
 
                 // * Calculate grasp quality for each normal candidate and record best one
-                float score = GraspQualityMethods::gp_voxelsuperimposition(Ti, this->target_tree_, this->gripper_tree_); // TODO Make virtual to be able to use any gp algorithm
+                float score = gq_virtual(Ti, this->target_tree_, this->gripper_tree_); // TODO Make virtual to be able to use any gp algorithm
                 if (score > best_local_score)
                 {
                     best_local_score = score;

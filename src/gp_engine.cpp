@@ -6,6 +6,7 @@
 #include <octomap/octomap.h>
 #include <octomap/ColorOcTree.h>
 #include <chrono>
+#include <iomanip> // std::setw, std::setfill
 #include <functional> // std::function, std::ref
 //#include <thread> // std::thread
 //#include <deque> // std::deque
@@ -202,18 +203,16 @@ public:
 
         for (octomap::OcTreeGraspQuality::leaf_iterator it_node = target_tree_->begin_leafs(), end = target_tree_->end_leafs(); it_node != end; ++it_node)
         {
-            current_node++; // advance progress tracker
-            std::cout << "Current node: " << current_node << std::endl;
-
             // Dispatch threaded worker to analyse node
             octomap::OcTreeGraspQualityNode::GraspQuality gq{node_gq_analysis(it_node, gq_function)};
 
             // Write to node
             it_node->setGraspQuality(gq);
 
-            // Print progress
-            //if (current_node % total_nodes/100) 
-            //std::cout << (current_node*100)/total_nodes << "%" << std::flush;
+            // Print progress and advance tracker
+            if (current_node % (total_nodes/100) == 0) 
+                std::cout << '\r' << std::setw(2) << std::setfill('0') << (current_node*100)/total_nodes << "%" << std::flush;
+            current_node++;
         }
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);

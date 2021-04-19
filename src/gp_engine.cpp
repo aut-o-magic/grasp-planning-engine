@@ -31,79 +31,49 @@ class graspQualityMap
 {
 public:
     graspQualityMap(const double resolution=0.1) : sensor_origin_{0,0,0}, target_tree_{new octomap::OcTreeGraspQuality(resolution)}, gripper_tree_{new octomap::OcTreeGripper(resolution)}, normal_gripper_{0,1,0}
-    {
-
-    }
+    {}
 
     /** 
      * Helper function to generate a simple anti-podal gripper model and save it as an .ot file
      * ! DEBUG only
     */
-    void build_simple_gripper()
+    void build_simple_gripper(const octomap::point3d& min_point3d, const octomap::point3d& max_point3d)
     {
-        // grasping surface anti-podal plates
-        /*
-        for (double z = 0.05; z <= 0.5; z = z + 0.05)
-        {
-            //xy rectangle plane
-            for (double x = 0; x < 0.2; x = x + 0.05)
-            {
-                for (double y = 0.1; y < 0.5; y = y + 0.05)
-                {
-                    octomap::point3d node_point3d{x,y,z};
-                    gripper_tree_->updateNode(node_point3d, true);
-                    gripper_tree_->setNodeIsGraspingSurface(node_point3d, true);
-                }
-            }
-        }
-        */
-        octomap::point3d min{0,0.1,0.05};
-        octomap::point3d max{0.2,0.5,0.6};
-        
-        add_graspable_region(min, max);
-        /*
-        // non-grasping surface anti-podal plates
-        double z = -0.05;
-        {
-            //xy rectangle plane
-            for (double x = 0; x < 0.2; x = x + 0.1)
-            {
-                for (double y = 0.1; y < 0.5; y = y + 0.1)
-                {
-                    octomap::point3d node_point3d{x,y,z};
-                    gripper_tree_->updateNode(node_point3d, true);
-                    gripper_tree_->setNodeIsGraspingSurface(node_point3d, false);
+        // * Non-graspable shell region
+        // Normal direction for gripping is {0,1,0}
+        const double res{this->gripper_tree_->getResolution()};
+        const octomap::point3d min_shell{min_point3d - octomap::point3d(res,res+res,0)};
+        const octomap::point3d max_shell{max_point3d + octomap::point3d(res+res,0,0)};
+        octomap::OcTreeKey minKey{};
+        octomap::OcTreeKey maxKey{};
+        gripper_tree_->coordToKeyChecked(min_shell, minKey);
+        gripper_tree_->coordToKeyChecked(max_shell, maxKey);
+
+        octomap::OcTreeKey k;
+        for (k[0] = minKey[0]; k[0] < maxKey[0]; ++k[0]){
+            for (k[1] = minKey[1]; k[1] < maxKey[1]; ++k[1]){
+                for (k[2] = minKey[2]; k[2] < maxKey[2]; ++k[2]){
+                    octomap::OcTreeGripperNode* n = gripper_tree_->search(k);
+                    if(!n) // If node has not been populated yet
+                    {
+                        octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, true);
+                        nn->setIsGraspingSurface(false);
+                    }
+                    else // If node exists
+                    {
+                        if (n->getOccupancy() < 0.5) // if node is free
+                            n->setLogOdds(this->gripper_tree_->getProbHitLog());
+                        n->setIsGraspingSurface(false);
+                    }
                 }
             }
         }
 
-        z = 0.65;
-        {
-            //xy rectangle plane
-            for (double x = 0; x < 0.2; x = x + 0.1)
-            {
-                for (double y = 0.1; y < 0.5; y = y + 0.1)
-                {
-                    octomap::point3d node_point3d{x,y,z};
-                    gripper_tree_->updateNode(node_point3d, true);
-                    gripper_tree_->setNodeIsGraspingSurface(node_point3d, false);
-                }
-            }
-        }
+        // * Override nodes within graspable region
+        add_graspable_region(min_point3d, max_point3d);
 
-        // back plate (end stop)
-        for (double z = -0.05; z < 0.65; z = z + 0.1)
-        {
-            for (double x = 0; x < 0.2; x = x + 0.1)
-            {
-                gripper_tree_->updateNode(octomap::point3d{x,0,z}, true);
-            }
-        }
-
-        //gripper_tree_->updateNode(octomap::point3d{1,1,1}, true);
-        */
         // save tree
-        ((octomap::ColorOcTree)*gripper_tree_).write("simple_gripper.ot");
+        ((octomap::ColorOcTree)*gripper_tree_).write("simplegripper.ot");
     }
 
     /**
@@ -298,7 +268,7 @@ private:
      * @returns GraspQuality object for the node
      */
     template<typename gq_method>
-    octomap::OcTreeGraspQualityNode::GraspQuality node_gq_analysis(const octomap::OcTreeGraspQuality::iterator& it_node, gq_method gq_virtual)
+    octomap::OcTreeGraspQualityNode::GraspQuality node_gq_analysis(const octomap::OcTreeGraspQuality::iterator& it_node, gq_method& gq_virtual)
     {
         octomap::OcTreeGraspQualityNode::GraspQuality gq{it_node->getGraspQuality()};
 
@@ -333,11 +303,10 @@ private:
                 Eigen::Vector3f norm_eigen{it_norm->x(), it_norm->y(), it_norm->z()};
                 Eigen::AngleAxisf rot{angle, norm_eigen}; // rotate around pointing vector axis
                 Ti.rotate(rot);
-
                 //write_grasp_visualisations(Ti);
 
                 // * Calculate grasp quality for each normal candidate and record best one
-                float score = gq_virtual(Ti, this->target_tree_, this->gripper_tree_); // TODO Make virtual to be able to use any gp algorithm
+                float score = gq_virtual(Ti, this->target_tree_, this->gripper_tree_);
                 if (score > best_local_score)
                 {
                     best_local_score = score;
@@ -420,7 +389,7 @@ private:
         octomap::OcTreeKey maxKey(0,0,0);
         gripper_tree_->coordToKeyChecked(min, minKey);
         gripper_tree_->coordToKeyChecked(max, maxKey);
-        
+
         octomap::OcTreeKey k;
         for (k[0] = minKey[0]; k[0] < maxKey[0]; ++k[0]){
             for (k[1] = minKey[1]; k[1] < maxKey[1]; ++k[1]){

@@ -192,7 +192,7 @@ public:
         }
         
         float best_global_score{-1}; // -1 will get overwritten in first iteration as gq is [0,1]
-        Eigen::Affine3f best_global_T1{}; // Gripper transformation of associated with highest score
+        octomap::point3d best_node{}; // Target node associated with highest graspability score
 
         // expand target_tree for complete analysis
         target_tree_->expand();
@@ -206,6 +206,12 @@ public:
             // Dispatch threaded worker to analyse node
             octomap::OcTreeGraspQualityNode::GraspQuality gq{node_gq_analysis(it_node, gq_function)};
 
+            if (gq.angle_quality.row(1).maxCoeff() > best_global_score)
+            {
+                best_global_score = gq.angle_quality.row(1).maxCoeff();
+                best_node = it_node.getCoordinate();
+            }
+
             // Write to node
             it_node->setGraspQuality(gq);
 
@@ -216,7 +222,7 @@ public:
         }
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-        std::cout << ">>>Grasp quality score: " << best_global_score << ", at: \n" << best_global_T1.matrix() << std::endl;
+        std::cout << ">>>Grasp quality score: " << best_global_score << ", at:\n" << best_node << std::endl;
         std::cout << "[update_global_grasp_quality] finished (" << duration.count() << "s)" << std::endl;
     }
 
@@ -280,7 +286,6 @@ private:
         for (unsigned int i=0; i<gq.angle_quality.row(0).size(); ++i)
         {
             float best_local_score{-1}; // grasp quality values will always be at least 0 so this will get overwritten on first iteration
-            Eigen::Affine3f best_local_T1{};
 
             // * Iterate over each solution of the surface reconstruction algorithm (R0)
             for (octomap::point3d_collection::iterator it_norm = normals.begin(), end = normals.end(); it_norm != end; ++it_norm)
@@ -300,15 +305,13 @@ private:
                 Eigen::Vector3f norm_eigen{it_norm->x(), it_norm->y(), it_norm->z()};
                 Eigen::AngleAxisf rot{angle, norm_eigen}; // rotate around pointing vector axis
                 Ti.rotate(rot);
+                
                 //write_grasp_visualisations(Ti);
 
                 // * Calculate grasp quality for each normal candidate and record best one
                 float score = gq_virtual(Ti, this->target_tree_, this->gripper_tree_);
                 if (score > best_local_score)
-                {
                     best_local_score = score;
-                    best_local_T1 = Ti;
-                }
             }
             // Write to gq object
             gq.angle_quality.row(1)(i) = best_local_score;

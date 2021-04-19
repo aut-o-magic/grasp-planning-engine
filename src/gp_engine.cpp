@@ -30,7 +30,7 @@ inline void pause()
 class graspQualityMap
 {
 public:
-    graspQualityMap(const double resolution=0.1) : sensor_origin_{0,0,0}, target_tree_{new octomap::OcTreeGraspQuality(resolution)}, gripper_tree_{new octomap::OcTreeGripper(resolution)}, normal_gripper_{0,1,0}
+    graspQualityMap(const double resolution=0.1) : target_tree_{new octomap::OcTreeGraspQuality(resolution)}, gripper_tree_{new octomap::OcTreeGripper(resolution)}, normal_gripper_{0,1,0}, sensor_origin_{0,0,0}
     {}
 
     /** 
@@ -70,10 +70,8 @@ public:
         }
 
         // * Override nodes within graspable region
-        add_graspable_region(min_point3d, max_point3d);
-
-        // save tree
-        ((octomap::ColorOcTree)*gripper_tree_).write("simplegripper.ot");
+        octomap::point3d grasp_center_point{add_graspable_region(min_point3d, max_point3d)};
+        this->gripper_tree_->setOrigin(grasp_center_point);
     }
 
     /**

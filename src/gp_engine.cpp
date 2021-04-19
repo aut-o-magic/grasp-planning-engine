@@ -157,11 +157,22 @@ public:
     const octomap::OcTreeGraspQuality* get_target_tree() const {return target_tree_;}
 
     /**
+     * Analyse graspability of a single target-tree node
+     * @param it_node
+     * @param algorithm_select
+     * @returns Gripper transformation in target reference frame
+     * TODO Finish
+     */ 
+    Eigen::Affine3f analyse_local_grasp_quality(octomap::OcTreeGraspQuality::iterator it_node, unsigned int algorithm_select = 0)
+    {
+
+    }
+
+    /**
      * Perform geometric fitting to update the grasp quality metric of the target surface
-     * ! Not finished
      * @param algorithm_select Implementation index of a specific grasp planning algorithm, listed as macros at top of source file
      */
-    void update_global_grasp_quality(unsigned int algorithm_select = 0)
+    void analyse_global_grasp_quality(unsigned int algorithm_select = 0)
     {
         std::cout << "[update_global_grasp_quality] started..." << std::endl;
         auto start = std::chrono::high_resolution_clock::now();

@@ -38,8 +38,9 @@ public:
      * Helper function to generate a simple anti-podal gripper model and save it as an .ot file
      * ! DEBUG only
     */
-    void build_simple_gripper(const octomap::point3d& min_point3d, const octomap::point3d& max_point3d)
+    void set_simple_gripper(const octomap::point3d& min_point3d, const octomap::point3d& max_point3d)
     {
+        std::cout << "[set_simple_gripper] started..." << std::endl;
         // * Non-graspable shell region
         // Normal direction for gripping is {0,1,0}
         const double res{this->gripper_tree_->getResolution()};
@@ -305,8 +306,8 @@ private:
                 Eigen::Vector3f norm_eigen{it_norm->x(), it_norm->y(), it_norm->z()};
                 Eigen::AngleAxisf rot{angle, norm_eigen}; // rotate around pointing vector axis
                 Ti.rotate(rot);
-                
-                //write_grasp_visualisations(Ti);
+
+                // write_grasp_visualisations(Ti); // ? Uncomment this to enable grasp visualisations for each grasp candidate
 
                 // * Calculate grasp quality for each normal candidate and record best one
                 float score = gq_virtual(Ti, this->target_tree_, this->gripper_tree_);

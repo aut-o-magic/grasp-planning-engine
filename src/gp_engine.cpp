@@ -201,9 +201,8 @@ public:
 
     /**
      * Perform geometric fitting to update the grasp quality metric of the target surface
-     * @param algorithm_select Implementation index of a specific grasp planning algorithm.
-     * 
-     * Grasp planning algorithms definitions
+     * @param algorithm_select Implementation index of a specific grasp planning algorithm, listed as macros at top of source file
+     * @note Grasp planning algorithms definitions:
      * 0 -> GP_ONLYVOXELSUPERIMPOSITION: Simply count the number of voxels within the graspable region that collide with voxels from the target
      * 1 -> GP_ONLYSURFACENORMALS: Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
      * 2 -> GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS: 0 and 1 methods combined

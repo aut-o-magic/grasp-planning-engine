@@ -159,11 +159,11 @@ public:
      * Analyse graspability of a single target-tree node
      * @param it_node Target node iterator
      * @param algorithm_select Implementation index of a specific grasp planning algorithm, listed as macros at top of source file
-     * @param visualise Write to file visualisations of grasp attempt
      * @returns Gripper transformation in target reference frame
      */ 
-    Eigen::Affine3f analyse_local_grasp_quality(octomap::OcTreeGraspQuality::iterator it_node, unsigned int algorithm_select = 0, bool visualise = false)
+    Eigen::Affine3f analyse_local_grasp_quality(octomap::OcTreeGraspQuality::iterator it_node, unsigned int algorithm_select = 0)
     {
+        std::cout << "[analyse_local_grasp_quality] started..." << std::endl;
         octomap::OcTreeGraspQualityNode::GraspQuality gq{it_node->getGraspQuality()};
         Eigen::Affine3f Tbest;
         float (*gq_function)(const Eigen::Affine3f &T, const octomap::OcTreeGraspQuality *target_tree_, octomap::OcTreeGripper *gripper_tree_); // Grasp Quality function handle
@@ -194,7 +194,7 @@ public:
 
         node_gq_analysis(it_node, this->target_tree_, this->gripper_tree_, gq_function, gq, Tbest);
 
-        if (visualise) write_grasp_visualisations(Tbest);
+        std::cout << "*** Best grasp candidate at " << it_node.getCoordinate() << " has a score of " << gq.angle_quality.row(1).maxCoeff() << " ***" << std::endl;
 
         return Tbest;
     }
@@ -309,7 +309,16 @@ public:
         return filtered_normals;
     }
 
-    // can use castRay to determine distance to closest voxel...
+    /**
+     * Convenience function for writing both local and global grasp visualisations to file
+     * @param TF Gripper affine transformation matrix
+     */
+    void write_grasp_visualisations(const Eigen::Affine3f& TF)
+    {
+        GraspVisualisations::visualise_local_grasp(target_tree_, gripper_tree_, false, TF).write("local_grasp_visual.ot");
+        GraspVisualisations::visualise_global_grasp(target_tree_, gripper_tree_, TF).write("global_grasp_visual.ot");
+        pause();
+    }
 
 private:
     /**
@@ -437,17 +446,6 @@ private:
         }
         else 
             std::cout << "occupancy probability at " << query << ":\t is unknown" << std::endl;    
-    }
-
-    /**
-     * Convenience function for writing both local and global grasp visualisations to file
-     * @param TF Gripper affine transformation matrix
-     */
-    void write_grasp_visualisations(const Eigen::Affine3f& TF)
-    {
-        GraspVisualisations::visualise_local_grasp(target_tree_, gripper_tree_, false, TF).write("local_grasp_visual.ot");
-        GraspVisualisations::visualise_global_grasp(target_tree_, gripper_tree_, TF).write("global_grasp_visual.ot");
-        pause();
     }
 
     /**

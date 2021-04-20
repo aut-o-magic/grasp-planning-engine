@@ -8,6 +8,7 @@
 #include <chrono>
 #include <iomanip> // std::setw, std::setfill
 #include <functional> // std::function, std::ref
+#include <memory> // std::make_shared, std::shared_ptr
 //#include <thread> // std::thread
 //#include <deque> // std::deque
 
@@ -31,7 +32,7 @@ inline void pause()
 class graspQualityMap
 {
 public:
-    graspQualityMap(const double resolution=0.1) : target_tree_{new octomap::OcTreeGraspQuality(resolution)}, gripper_tree_{new octomap::OcTreeGripper(resolution)}, normal_gripper_{0,1,0}, sensor_origin_{0,0,0}
+    graspQualityMap(const double resolution=0.1) : target_tree_{new octomap::OcTreeGraspQuality(resolution)}, gripper_tree_{new octomap::OcTreeGripper(resolution)}, sensor_origin_{0,0,0}
     {}
 
     /** 
@@ -42,7 +43,8 @@ public:
     {
         std::cout << "[set_simple_gripper] started..." << std::endl;
         // * Non-graspable shell region
-        // Normal direction for gripping is {0,1,0}
+        octomap::point3d grasping_normal{0,1,0}; // Normal direction for gripping is {0,1,0}
+        this->gripper_tree_->setGraspingNormal(grasping_normal);
         const double res{this->gripper_tree_->getResolution()};
         const octomap::point3d min_shell{min_point3d - octomap::point3d(res,res+res,0)};
         const octomap::point3d max_shell{max_point3d + octomap::point3d(res+res,0,0)};
@@ -105,7 +107,7 @@ public:
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
         gripper_tree_->importOcTree(*octree);
-        this->normal_gripper_ = gripper_normal;
+        gripper_tree_->setGraspingNormal(gripper_normal);
     }    
 
     /**
@@ -119,7 +121,7 @@ public:
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
         gripper_tree_->importOcTree(*octree);
-        this->normal_gripper_ = gripper_normal;
+        gripper_tree_->setGraspingNormal(gripper_normal);
         octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
         this->gripper_tree_->setOrigin(grasp_center_point);
     }
@@ -127,13 +129,11 @@ public:
     /**
      * Setter for gripper tree attribute and draw graspable bounding box (BBX)
      * @param octree input gripper octree
-     * @param gripper_normal Normal vector of the gripper towards the target surface
      */
-    void set_gripper_tree(octomap::OcTreeGripper* octree, const octomap::point3d& gripper_normal)
+    void set_gripper_tree(octomap::OcTreeGripper* octree)
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
         gripper_tree_ = octree;
-        this->normal_gripper_ = gripper_normal;
     }
 
     /**
@@ -143,11 +143,10 @@ public:
      * @param min_BBX minimum coordinate of BBX in meters
      * @param max_BBX maximum coordinate of BBX in meters
      */
-    void set_gripper_tree(octomap::OcTreeGripper* octree, const octomap::point3d& gripper_normal, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
+    void set_gripper_tree(octomap::OcTreeGripper* octree, const octomap::point3d& min_BBX, const octomap::point3d& max_BBX)
     {
         std::cout << "[set_gripper_tree] started..." << std::endl;
         gripper_tree_ = octree;
-        this->normal_gripper_ = gripper_normal;
         octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
         this->gripper_tree_->setOrigin(grasp_center_point);
     }
@@ -158,27 +157,65 @@ public:
 
     /**
      * Analyse graspability of a single target-tree node
-     * @param it_node
-     * @param algorithm_select
+     * @param it_node Target node iterator
+     * @param algorithm_select Implementation index of a specific grasp planning algorithm, listed as macros at top of source file
+     * @param visualise Write to file visualisations of grasp attempt
      * @returns Gripper transformation in target reference frame
-     * TODO Finish
      */ 
-    Eigen::Affine3f analyse_local_grasp_quality(octomap::OcTreeGraspQuality::iterator it_node, unsigned int algorithm_select = 0)
+    Eigen::Affine3f analyse_local_grasp_quality(octomap::OcTreeGraspQuality::iterator it_node, unsigned int algorithm_select = 0, bool visualise = false)
     {
+        octomap::OcTreeGraspQualityNode::GraspQuality gq{it_node->getGraspQuality()};
+        Eigen::Affine3f Tbest;
+        float (*gq_function)(const Eigen::Affine3f &T, const octomap::OcTreeGraspQuality *target_tree_, octomap::OcTreeGripper *gripper_tree_); // Grasp Quality function handle
 
+        switch(algorithm_select) {
+        case GP_ONLYVOXELSUPERIMPOSITION:
+        {
+            std::cout << "ONLYVOXELSUPERIMPOSITION SELECTED" << std::endl;
+            gq_function = GraspQualityMethods::gq_voxelsuperimposition;
+            break;
+        }
+        case GP_ONLYSURFACENORMALS:
+            std::cout << "ONLYSURFACENORMALS SELECTED" << std::endl;
+            gq_function = GraspQualityMethods::gq_surfacenormals;
+            break;
+        case GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS:
+            std::cout << "VOXELSUPERIMPOSITIONANDSURFACENORMALS SELECTED" << std::endl;
+            gq_function = GraspQualityMethods::gq_voxelsuperimposition_surfacenormals;
+            break;
+        case GP_RAYCASTINGANTIPODALPLANES:
+            std::cout << "RAYCASTINGANTIPODALPLANES SELECTED" << std::endl;
+            gq_function = GraspQualityMethods::gq_raycasting;
+            break;
+        default:
+            std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;
+            return Tbest;
+        }
+
+        node_gq_analysis(it_node, this->target_tree_, this->gripper_tree_, gq_function, gq, Tbest);
+
+        if (visualise) write_grasp_visualisations(Tbest);
+
+        return Tbest;
     }
 
     /**
      * Perform geometric fitting to update the grasp quality metric of the target surface
-     * @param algorithm_select Implementation index of a specific grasp planning algorithm, listed as macros at top of source file
+     * @param algorithm_select Implementation index of a specific grasp planning algorithm.
+     * 
+     * Grasp planning algorithms definitions
+     * 0 -> GP_ONLYVOXELSUPERIMPOSITION: Simply count the number of voxels within the graspable region that collide with voxels from the target
+     * 1 -> GP_ONLYSURFACENORMALS: Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
+     * 2 -> GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS: 0 and 1 methods combined
+     * 3 -> GP_RAYCASTINGANTIPODALPLANES: Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
      */
     void analyse_global_grasp_quality(unsigned int algorithm_select = 0)
     {
         std::cout << "[update_global_grasp_quality] started..." << std::endl;
         auto start = std::chrono::high_resolution_clock::now();
         float (*gq_function)(const Eigen::Affine3f &T, const octomap::OcTreeGraspQuality *target_tree_, octomap::OcTreeGripper *gripper_tree_); // Grasp Quality function handle
+        
         // grasp planning algorithm select
-
         switch(algorithm_select) {
             case GP_ONLYVOXELSUPERIMPOSITION:
             {
@@ -245,7 +282,7 @@ public:
      * @returns Collection of surface normals normalised vectors
      */
     template<typename NODE>
-    octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d) const
+    static octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d)
     {
         const double angle_threshold_same_vector = 0.01; // rad (0.01rad = 0.573deg)
         octomap::point3d_collection normals;
@@ -277,22 +314,41 @@ public:
 
 private:
     /**
-     * Grasp quality analysis worker
-     * @param it Target node iterator
+     * Grasp quality analysis worker using *this object attributes
+     * @param it_node Target node iterator
      * @param gq_virtual Grasp quality method to use
      * @returns GraspQuality object for the node
      */
     template<typename gq_method>
-    octomap::OcTreeGraspQualityNode::GraspQuality node_gq_analysis(const octomap::OcTreeGraspQuality::iterator& it_node, gq_method& gq_virtual)
+    octomap::OcTreeGraspQualityNode::GraspQuality node_gq_analysis(const octomap::OcTreeGraspQuality::leaf_iterator& it_node, gq_method& gq_virtual) const
     {
         octomap::OcTreeGraspQualityNode::GraspQuality gq{it_node->getGraspQuality()};
-
+        Eigen::Affine3f Tbest;
+        node_gq_analysis(it_node, this->target_tree_, this->gripper_tree_, gq_virtual, gq, Tbest);
+        return gq;
+    }
+    /**
+     * Grasp quality analysis worker
+     * @param it_node Target node iterator
+     * @param target_tree target tree
+     * @param gripper_tree gripper tree
+     * @param gq_virtual Grasp quality method to use
+     * @param gq Grasp quality node attribute to populate
+     * @param Tbest Transformation of gripper transformation for best grasp candidate
+     * @returns Graspability score of best grasp candidate
+     */
+    template<typename gq_method>
+    static void node_gq_analysis(const octomap::OcTreeGraspQuality::leaf_iterator& it_node, const octomap::OcTreeGraspQuality* target_tree, octomap::OcTreeGripper* gripper_tree, gq_method& gq_virtual, octomap::OcTreeGraspQualityNode::GraspQuality& gq, Eigen::Affine3f& Tbest)
+    {
         // * Retrieve surface normals and gripper translation (t0)
-        octomap::point3d_collection normals = get_surface_normals(target_tree_, it_node.getCoordinate());
-        if (normals.empty()) return gq; // if there is no normal to the surface, terminate early
+        octomap::point3d_collection normals = get_surface_normals(target_tree, it_node.getCoordinate());
+        if (normals.empty()) return; // if there is no normal to the surface, terminate early
         Eigen::Vector3f coordinates_node{it_node.getCoordinate().x(), it_node.getCoordinate().y(), it_node.getCoordinate().z()};
         Eigen::Affine3f T0{Eigen::Affine3f::Identity()}; // T0 is transformation from gripper origin in world (target) frame to grasping point and pointing vector as dictated by each output of marching cubes algorithm 
         T0.translation() = coordinates_node;
+
+        // Keep record of best nodal score
+        float best_nodal_score{-1}; 
 
         // * Iterate over each gripper angle discretisation (R01)
         for (unsigned int i=0; i<gq.angle_quality.row(0).size(); ++i)
@@ -305,8 +361,8 @@ private:
                 // rotation between gripper origin pointing vec and normal is R0 // ! gripper does not necessary stay horizontal with this convention, but results are reproduceable
                 it_norm->normalize(); // Assure normalised normal vector
 
-                float rot_angle{(float)normal_gripper_.angleTo(*it_norm)};
-                octomap::point3d rot_axis{normal_gripper_.cross(*it_norm)};
+                float rot_angle{(float)gripper_tree->getGraspingNormal().angleTo(*it_norm)};
+                octomap::point3d rot_axis{gripper_tree->getGraspingNormal().cross(*it_norm)};
                 Eigen::Vector3f eigen_rot_axis{rot_axis.x(), rot_axis.y(), rot_axis.z()};
                 Eigen::AngleAxisf rotation{rot_angle, eigen_rot_axis};
                 T0.linear() = rotation.toRotationMatrix(); // rotation component is called "linear part" in Eigen library https://eigen.tuxfamily.org/dox/classEigen_1_1Transform.html
@@ -318,17 +374,23 @@ private:
                 Eigen::AngleAxisf rot{angle, norm_eigen}; // rotate around pointing vector axis
                 Ti.rotate(rot);
 
-                // write_grasp_visualisations(Ti); // ? Uncomment this to enable grasp visualisations for each grasp candidate
-
                 // * Calculate grasp quality for each normal candidate and record best one
-                float score = gq_virtual(Ti, this->target_tree_, this->gripper_tree_);
+                float score = gq_virtual(Ti, target_tree, gripper_tree);
                 if (score > best_local_score)
+                {
                     best_local_score = score;
+
+                    // record best nodal grasp candidate
+                    if (best_local_score > best_nodal_score)
+                    {
+                        Tbest = Ti;
+                        best_nodal_score = best_local_score;
+                    }
+                }
             }
             // Write to gq object
             gq.angle_quality.row(1)(i) = best_local_score;
         }
-        return gq;
     }
 
     /**
@@ -428,6 +490,5 @@ private:
 
     octomap::OcTreeGraspQuality* target_tree_;
     octomap::OcTreeGripper* gripper_tree_;
-    octomap::point3d normal_gripper_;
     octomap::point3d sensor_origin_;
 };

@@ -79,9 +79,8 @@ namespace GraspVisualisations
      * Visualise surface normals density of target tree using filtered marching cubes surface reconstruction algorithm.
      * Density color coding: white = 0, red = 1, green = 2, blue = 3, black => 4
      * @param target_tree_ Target object octree
-     * @param gripper_tree_ Gripper octree
      */
-    void visualise_surface_normals_density(octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_)
+    void visualise_surface_normals_density(octomap::OcTreeGraspQuality* target_tree_)
     {
         std::cout << "[visualise_surface_normals_density] started..." << std::endl;
         octomap::ColorOcTree color_tree_normals_density{target_tree_->getResolution()};

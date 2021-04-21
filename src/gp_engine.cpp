@@ -422,14 +422,12 @@ private:
                     octomap::OcTreeGripperNode* n = gripper_tree_->search(k);
                     if(!n) // If node has not been populated yet
                     {
-                        octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, true);
+                        octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, false);
                         nn->setIsGraspingSurface(true);
                     } 
                     else // If node exists
                     {
-                        // TODO Check this updates node at lowest depth level
-                        if (n->getOccupancy() < 0.5) // if node is free
-                            n->setLogOdds(this->gripper_tree_->getProbHitLog());
+                        n->setLogOdds(gripper_tree_->getProbMissLog()); // set as free
                         n->setIsGraspingSurface(true);
                     }
                 }

@@ -100,7 +100,7 @@ namespace GraspVisualisations
             normals = get_surface_normals(target_tree_, it.getCoordinate());
 
             // Populate color_tree_normals_density object
-            octomap::ColorOcTreeNode* snn = color_tree_normals_density.updateNode(it.getCoordinate(), true);
+            octomap::ColorOcTreeNode* snn = color_tree_normals_density.updateNode(it.getCoordinate(), it->getLogOdds());
             octomap::ColorOcTreeNode::Color color{0,0,0};
             // white = 0, red = 1, green = 2, blue = 3, black => 4
             if (normals.size() == 0) {normal0++;}
@@ -174,23 +174,30 @@ namespace GraspVisualisations
 
                         // colorise nodes
                         octomap::ColorOcTreeNode::Color color{0,0,0};
+                        float log_odds;
                         if (gn) // if gripper node present
                         {
-                            octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, true);
-                            if (tn)
+                            if (tn && tn->getOccupancy() > 0.5) // if target node is occupied
                             {
+                                log_odds = tn->getLogOdds();
                                 if (gn->isGraspingSurface()) color.g = 255;
                                 else color.r = 255;
                             }
-                            else color.b = 255; // light blue for gripper-only nodes
-                            n->setColor(color);
+                            else 
+                            {
+                                log_odds = gn->getLogOdds();
+                                color.b = 255; // light blue for gripper-only nodes
+                            }
                         }
                         else if (tn && show_target_voxels)
                         {
-                            octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, true);
+                            log_odds = tn->getLogOdds();
                             color.b = 50; // dark blue for target-only nodes
-                            n->setColor(color);
+                            
                         }
+                        else continue;
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, gn->getLogOdds());
+                        n->setColor(color);
                     }
                 }
             }
@@ -214,54 +221,20 @@ namespace GraspVisualisations
                 // colorise nodes
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d);
                 octomap::ColorOcTreeNode::Color color{0,0,0};
-                if (n) // if not unknown, occupied by both octrees
+                float log_odds;
+                if (n && n->getOccupancy() > 0.5) // if target has an occupied node in that location
                 {
+                    log_odds = n->getLogOdds();
                     if (it->isGraspingSurface()) color.g = 255;
                     else color.r = 255;
                 }
-                else color.b = 255; // only populated by gripper
-
-                octomap::ColorOcTreeNode* nn = color_tree.updateNode(gripper3d, true);
-                nn->setColor(color);
-            }
-        }
-        #endif
-
-        // ! Below code plots voxels with spacing between them due to lower resolution than color_tree, hence it does not work as desired
-        #if 0
-        if (show_target_voxels) // if target voxels shall be plotted, iterate over local bbx of target tree
-        {
-            target_tree_->expand();
-
-            double x,y,z;
-            gripper_tree_->getMetricMax(x,y,z);
-            x += BBX_margin;
-            y += BBX_margin;
-            z += BBX_margin;
-            octomap::point3d max_bbx{(float)x,(float)y,(float)z};
-            gripper_tree_->getMetricMin(x,y,z);
-            x -= BBX_margin;
-            y -= BBX_margin;
-            z -= BBX_margin;
-            octomap::point3d min_bbx{(float)x,(float)y,(float)z};
-            color_tree.setBBXMax(max_bbx);
-            color_tree.setBBXMin(min_bbx);
-
-            // iterate over target octree
-            for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_->begin_leafs(), end=target_tree_->end_leafs(); it!= end; ++it)
-            {
-                octomap::point3d world3d{it.getCoordinate()};
-
-                Eigen::Vector3f coord_w{world3d.x(), world3d.y(), world3d.z()};
-                Eigen::Vector3f coord_g{T.inverse() * coord_w}; // TODO optimise inverse call
-                octomap::point3d gripper3d{coord_g.x(), coord_g.y(), coord_g.z()};
-
-                octomap::ColorOcTreeNode* n = color_tree.search(gripper3d);
-                if (!n && color_tree.inBBX(gripper3d)) // if not null already exists, and if outside of BBX not within grasp local region
+                else // only populated by gripper
                 {
-                    octomap::ColorOcTreeNode* nn = color_tree.updateNode(gripper3d, true);
-                    nn->setColor(0,0,50); // dark blue for target-only nodes
+                    log_odds = it->getLogOdds();
+                    color.b = 255; 
                 }
+                octomap::ColorOcTreeNode* nn = color_tree.updateNode(gripper3d, log_odds);
+                nn->setColor(color);
             }
         }
         #endif
@@ -328,25 +301,34 @@ namespace GraspVisualisations
 
                     // colorise nodes
                     octomap::ColorOcTreeNode::Color color{0,0,0};
+                    float log_odds;
                     if (!tn && !gn) // if both nodes null, node is free
                     {
                         //color_tree.updateNode(world3d, false); // ? By understanding unknown state as free, we don't really need to explicitely set to free
                     }
                     else // occupied
                     {
-                        octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, true);
-
                         if (!tn != !gn) // XOR
                         {
-                            // node is not occupied by both octrees
-                            if (tn) color.b = 100; // dark blue
-                            else color.b = 255; // light blue
+                            // node is not known in both octrees
+                            if (tn) 
+                            {
+                                log_odds = tn->getLogOdds();
+                                color.b = 100; // dark blue
+                            }
+                            else 
+                            {
+                                log_odds = gn->getLogOdds();
+                                color.b = 255; // light blue
+                            }
                         }
-                        else // node occupied by both gripper and target trees
+                        else // node known to both gripper and target trees
                         {
+                            log_odds = tn->getLogOdds();
                             if (gn->isGraspingSurface()) color.g = 255;
                             else color.r = 255;
                         }
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, log_odds);
                         n->setColor(color);
                     }
                 }
@@ -371,7 +353,7 @@ namespace GraspVisualisations
             
             // colorise nodes
             octomap::ColorOcTreeNode::Color color{0,0,0};
-            octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, true);
+            octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, it->getLogOdds());
             color.b = 50;
             n->setColor(color);
         }
@@ -388,7 +370,7 @@ namespace GraspVisualisations
             // colorise nodes
             octomap::ColorOcTreeNode* n = color_tree.search(world3d);
             octomap::ColorOcTreeNode::Color color{0,0,0};
-            if (n) // if not unknown
+            if (n && n->getOccupancy() > 0.5) // if occupied
             {
                 int color_b_node{n->getColor().b};
                 if (0 < color_b_node && color_b_node < 255) // if node is blue but not _fully_ blue (255b is associated with gripper-only nodes)
@@ -400,7 +382,7 @@ namespace GraspVisualisations
             }
             else // only populated by gripper
             {
-                octomap::ColorOcTreeNode* nn = color_tree.updateNode(world3d, true);
+                octomap::ColorOcTreeNode* nn = color_tree.updateNode(world3d, it->getLogOdds());
                 color.b = 255;
                 nn->setColor(color);
             }

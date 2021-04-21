@@ -5,6 +5,21 @@
 namespace GraspPlanningUtils
 {
     /**
+     * Simple std::out formatter for node occupancy queries
+     * @param query 3D point being queried
+     * @param node corresponding octree node
+     */
+    static void print_query_info(const octomap::point3d& query, const octomap::OcTreeNode* node)
+    {
+        if (node) // if not NULL
+        {
+            std::cout << "occupancy probability at " << query << ":\t " << node->getOccupancy() << std::endl;
+        }
+        else 
+            std::cout << "occupancy probability at " << query << ":\t is unknown" << std::endl;    
+    }
+
+    /**
      * Compute vector with max composite of each coordinate
      * @param __vector1 First vector
      * @param __vector2 Second vector

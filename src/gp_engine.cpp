@@ -403,21 +403,6 @@ private:
     }
 
     /**
-     * Simple std::out formatter for node occupancy queries
-     * @param query 3D point being queried
-     * @param node corresponding octree node
-     */
-    void print_query_info(octomap::point3d query, octomap::OcTreeNode* node)
-    {
-        if (node) // if not NULL
-        {
-            std::cout << "occupancy probability at " << query << ":\t " << node->getOccupancy() << std::endl;
-        }
-        else 
-            std::cout << "occupancy probability at " << query << ":\t is unknown" << std::endl;    
-    }
-
-    /**
      * Adds a graspable region of gripper octree as BBX (Bounding Box)
      * @param min minimum corner coordinate of bounding box in meters
      * @param max maximum corner coordinate of bounding box in meters

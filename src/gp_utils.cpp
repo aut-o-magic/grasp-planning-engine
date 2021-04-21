@@ -1,3 +1,5 @@
+#pragma once
+
 #include <octomap/octomap.h>
 #include "octomap_grasping/OcTreeGripper.hpp"
 #include <limits>

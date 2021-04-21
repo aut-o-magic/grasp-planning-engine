@@ -3,15 +3,19 @@
 #include <octomap/octomap.h>
 #include "octomap_grasping/OcTreeGraspQuality.hpp"
 #include "octomap_grasping/OcTreeGripper.hpp"
+#include "gp_utils.cpp"
 
 namespace GraspQualityMethods
 {
+    static std::vector<std::pair<octomap::OcTreeGripper::iterator, octomap::OcTreeGripper::iterator>> grasping_pairs; // TODO Set as private --somehow?
+
     /**
      * Count the number of voxels within the graspable region that collide with voxels from the target
      * @param T homogenous transformation from origin to gripper grasping pose
      * @param target_tree_ Target object octree
      * @param gripper_tree_ Gripper octree
      * @returns Normalised grasp quality score between [0,1]
+     * ? Alternative approach would be with computeRay(). May be much faster?
      */
     static float gq_voxelsuperimposition(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_)
     {
@@ -48,11 +52,68 @@ namespace GraspQualityMethods
      * @param gripper_tree_ Gripper octree
      * @returns Normalised grasp quality score between [0,1]
      * TODO algorithm
+     * TODO avoid hardcoding grasping plane here, in graspingPairs fcn call
      */
     static float gq_surfacenormals(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_)
     {
+        if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
+
+        std::vector<int> histogram_angles_left (360,0); // create 360 fields populated with 0s
+        std::vector<int> histogram_angles_right (360,0); // create 360 fields populated with 0s
+
+        for(auto it = grasping_pairs.begin(); it != grasping_pairs.end(); ++it)
+        {
+            // retrieve pair coordinates
+            octomap::point3d coord_g_left_3d{it->first.getCoordinate()};
+            octomap::point3d coord_g_right_3d{it->second.getCoordinate()};
+
+            // transform coordinates according to T
+            Eigen::Vector3f coord_g_left{coord_g_left_3d.x(),coord_g_left_3d.y(),coord_g_left_3d.z()};
+            Eigen::Vector3f coord_g_right{coord_g_right_3d.x(),coord_g_right_3d.y(),coord_g_right_3d.z()};
+            Eigen::Vector3f coord_w_left{T * coord_g_left};
+            Eigen::Vector3f coord_w_right{T * coord_g_right};
+
+            octomap::point3d coord_w_left_3d{coord_w_left.x(), coord_w_left.y(), coord_w_left.z()};
+            octomap::point3d coord_w_right_3d{coord_w_right.x(), coord_w_right.y(), coord_w_right.z()};
+            octomap::point3d direction{(coord_w_right_3d-coord_w_left_3d).normalized()}; // First to second
+            octomap::point3d hit_left;
+            octomap::point3d hit_right;
+
+            // build histogram of angles
+            if (target_tree_->castRay(coord_w_left_3d, direction, hit_left, true)) // if occupied node was hit
+            {
+                octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
+                if (n && n->getOccupancy() > 0.5) // if occupied
+                {
+                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
+                    for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                    {
+                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                        int angle_deg = (int)(rot_angle_rad/(M_PI)) * 180 + 180;
+                        if (angle_deg < 0) std::cout << "NEGATIVE ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        ++histogram_angles_left[angle_deg];
+                    }
+                }
+            }
+            if (target_tree_->castRay(coord_w_right_3d, -direction, hit_right, true)) // if occupied node was hit
+            {
+                octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
+                if (n && n->getOccupancy() > 0.5) // if occupied
+                {
+                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
+                    for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                    {
+                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                        int angle_deg = (int)(rot_angle_rad/(M_PI)) * 180 + 180;
+                        if (angle_deg < 0) std::cout << "NEGATIVE ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        ++histogram_angles_right[angle_deg];
+                    }
+                }
+            }
+        }
+
+        // TODO Quantify score based on angles histograms
         float score{0};
-        // ? Can create a sub-octree that is just the area of the target that COLLIDES with the graspable voxels
 
         return score;
     }

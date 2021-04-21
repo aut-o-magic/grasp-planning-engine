@@ -36,9 +36,10 @@ public:
     {}
 
     /** 
-     * Helper function to generate a simple anti-podal gripper model and save it as an .ot file
-     * ! DEBUG only
-    */
+     * Helper function to generate a representative simple anti-podal gripper model with same BBX grasping region as more complex alternative
+     * @param min_point3d minimum corner coordinate of bounding box in meters
+     * @param max_point3d maximum corner coordinate of bounding box in meters
+     */
     void set_simple_gripper(const octomap::point3d& min_point3d, const octomap::point3d& max_point3d)
     {
         std::cout << "[set_simple_gripper] started..." << std::endl;

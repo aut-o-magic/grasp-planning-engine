@@ -2,6 +2,7 @@
 #include "octomap_grasping/OcTreeGripper.hpp"
 #include "gq_algorithms.cpp"
 #include "grasp_visualisations.cpp"
+#include "gp_utils.cpp"
 
 #include <octomap/octomap.h>
 #include <octomap/ColorOcTree.h>
@@ -276,41 +277,6 @@ public:
     }
 
     /**
-     * Compute the surface normals of the octree at the target point
-     * @param tree Input OcTree
-     * @param point3d Point at which to compute the surface normals
-     * @returns Collection of surface normals normalised vectors
-     */
-    template<typename NODE>
-    static octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d)
-    {
-        const double angle_threshold_same_vector = 0.01; // rad (0.01rad = 0.573deg)
-        octomap::point3d_collection normals;
-        octomap::point3d_collection filtered_normals;
-        if (!tree->getNormals(point3d, normals, false)) // run octomap surface reconstruction function considering unknown measurements as FREE
-        {
-            std::cerr << "[gp_engine::get_surface_normals()] call failed" << std::endl;
-            return normals;
-        }
-        // loop through normal vector collection and remove repeated entries
-        bool already_exists{false}; // flag to hold whether vector already exists in filtered normals
-        for (unsigned int i=0; i < normals.size(); ++i)
-        {
-            octomath::Vector3 current_vector{normals[i]};
-            
-            // check if vector already exists in filtered collection, if not push it there
-            for (unsigned int j=0; j < filtered_normals.size(); ++j)
-            {
-                if (current_vector.angleTo(filtered_normals[j]) < angle_threshold_same_vector) already_exists = true;
-            }
-            // if vector normal doesnt already exist in filtered collection, push it there
-            if (!already_exists) filtered_normals.push_back(current_vector);
-            already_exists = false; // reset flag
-        }
-        return filtered_normals;
-    }
-
-    /**
      * Convenience function for writing both local and global grasp visualisations to file
      * @param TF Gripper affine transformation matrix
      */
@@ -350,7 +316,7 @@ private:
     static void node_gq_analysis(const octomap::OcTreeGraspQuality::leaf_iterator& it_node, const octomap::OcTreeGraspQuality* target_tree, octomap::OcTreeGripper* gripper_tree, gq_method& gq_virtual, octomap::OcTreeGraspQualityNode::GraspQuality& gq, Eigen::Affine3f& Tbest)
     {
         // * Retrieve surface normals and gripper translation (t0)
-        octomap::point3d_collection normals = get_surface_normals(target_tree, it_node.getCoordinate());
+        octomap::point3d_collection normals = GraspPlanningUtils::get_surface_normals(target_tree, it_node.getCoordinate());
         if (normals.empty()) return; // if there is no normal to the surface, terminate early
         Eigen::Vector3f coordinates_node{it_node.getCoordinate().x(), it_node.getCoordinate().y(), it_node.getCoordinate().z()};
         Eigen::Affine3f T0{Eigen::Affine3f::Identity()}; // T0 is transformation from gripper origin in world (target) frame to grasping point and pointing vector as dictated by each output of marching cubes algorithm 

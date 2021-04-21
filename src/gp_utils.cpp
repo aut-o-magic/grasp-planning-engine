@@ -7,6 +7,20 @@
 namespace GraspPlanningUtils
 {
     /**
+     * Apply a spatial transformation to a point3d data type
+     * @param T Affine transformation
+     * @param point3d Point3d to transform
+     * @returns Transformed point3d
+     */
+    static octomap::point3d transform_point3d(const Eigen::Affine3f& T, const octomap::point3d& point3d)
+    {
+        Eigen::Vector3f coord_0{point3d.x(), point3d.y(), point3d.z()};
+        Eigen::Vector3f coord_1{T * coord_0};
+        octomap::point3d coord_1_3d{coord_1.x(), coord_1.y(), coord_1.z()};
+        return coord_1_3d;
+    }
+
+    /**
      * Simple std::out formatter for node occupancy queries
      * @param query 3D point being queried
      * @param node corresponding octree node

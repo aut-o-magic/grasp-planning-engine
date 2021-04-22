@@ -35,7 +35,7 @@ namespace GraspQualityMethods
             octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
 
             octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d);
-            if (n) // if target node exists
+            if (n && n->getOccupancy() > 0.5) // if target node is occupied
             {
                 if(it->isGraspingSurface()) score += reward;
                 else score -= penalty;

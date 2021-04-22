@@ -89,8 +89,8 @@ namespace GraspQualityMethods
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
                         float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
-                        int angle_deg = (int)(rot_angle_rad/(M_PI)) * 180 + 180;
-                        if (angle_deg < 0) std::cout << "NEGATIVE ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        int angle_deg = (int)(rot_angle_rad/(M_PI)*180) + 180;
+                        if (angle_deg < 0 || angle_deg >360) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
                         ++histogram_angles_left[angle_deg];
                     }
                 }
@@ -104,8 +104,8 @@ namespace GraspQualityMethods
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
                         float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
-                        int angle_deg = (int)(rot_angle_rad/(M_PI)) * 180 + 180;
-                        if (angle_deg < 0) std::cout << "NEGATIVE ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        int angle_deg = (int)(rot_angle_rad/(M_PI)*180) + 180;
+                        if (angle_deg < 0 || angle_deg >360) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
                         ++histogram_angles_right[angle_deg];
                     }
                 }

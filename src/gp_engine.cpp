@@ -19,17 +19,6 @@
 #define GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS 2 // 0 and 1 methods combined
 #define GP_RAYCASTINGANTIPODALPLANES 3 // Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
 
-/**
- * Pause program execution, prompting a key-press in the terminal to continue
- */
-inline void pause()
-{
-    do 
-    {
-        std::cout << '\n' << "Press a key to continue...";
-    } while (std::cin.get() != '\n');
-}
-
 class graspQualityMap
 {
 public:
@@ -284,7 +273,6 @@ public:
     {
         GraspVisualisations::visualise_local_grasp(target_tree_, gripper_tree_, false, TF).write("local_grasp_visual.ot");
         GraspVisualisations::visualise_global_grasp(target_tree_, gripper_tree_, TF).write("global_grasp_visual.ot");
-        pause();
     }
 
 private:

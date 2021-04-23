@@ -54,8 +54,8 @@ namespace GraspQualityMethods
     {
         if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
 
-        std::vector<int> histogram_angles_left (360,0); // create 360 fields populated with 0s
-        std::vector<int> histogram_angles_right (360,0); // create 360 fields populated with 0s
+        std::vector<int> histogram_angles_left (181,0); // create 181 (0,180) fields populated with 0s
+        std::vector<int> histogram_angles_right (181,0); // create 181 (0,180) fields populated with 0s
 
         for(auto it = grasping_pairs.begin(); it != grasping_pairs.end(); ++it)
         {
@@ -66,7 +66,7 @@ namespace GraspQualityMethods
             // transform coordinates according to T
             octomap::point3d world3d_left{GraspPlanningUtils::transform_point3d(T, gripper3d_left)};
             octomap::point3d world3d_right{GraspPlanningUtils::transform_point3d(T, gripper3d_right)};
-
+            
             octomap::point3d direction{(world3d_right-world3d_left).normalized()}; // First to second
             octomap::point3d hit_left;
             octomap::point3d hit_right;
@@ -82,7 +82,7 @@ namespace GraspQualityMethods
                     {
                         float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
                         int angle_deg = (int)(rot_angle_rad/(M_PI)*180) + 180;
-                        if (angle_deg < 0 || angle_deg >360) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        if (angle_deg < 0 || angle_deg >180) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
                         ++histogram_angles_left[angle_deg];
                     }
                 }
@@ -97,11 +97,16 @@ namespace GraspQualityMethods
                     {
                         float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
                         int angle_deg = (int)(rot_angle_rad/(M_PI)*180) + 180;
-                        if (angle_deg < 0 || angle_deg >360) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        if (angle_deg < 0 || angle_deg >180) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
                         ++histogram_angles_right[angle_deg];
                     }
                 }
             }
+        }
+
+        for (unsigned int i=0; i <= 180; ++i)
+        {
+            std::cout << "histo[" << i << "]: left=" << histogram_angles_left[i] << ", right=" << histogram_angles_right[i] << std::endl;
         }
 
         // TODO Quantify score based on angles histograms

@@ -4,6 +4,7 @@
 #include <octomap/ColorOcTree.h>
 #include "octomap_grasping/OcTreeGraspQuality.hpp"
 #include "octomap_grasping/OcTreeGripper.hpp"
+#include "gp_utils.cpp"
 
 /**
  * Translated copy of the origin of a color octree
@@ -163,13 +164,11 @@ namespace GraspVisualisations
                     for (float z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + (float)color_tree.getResolution()/2)
                     {
                         // transform coordinates according to T
-                        Eigen::Vector3f coord_g{x,y,z};
                         octomap::point3d gripper3d{x,y,z};
-                        Eigen::Vector3f coord_w{T * coord_g};
-                        octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
+                        octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
 
                         // search for corresponding nodes in octrees
-                        octomap::OcTreeGripperNode* gn = gripper_tree_->search(coord_g.x(), coord_g.y(), coord_g.z());
+                        octomap::OcTreeGripperNode* gn = gripper_tree_->search(gripper3d);
                         octomap::OcTreeGraspQualityNode* tn = target_tree_->search(world3d);
 
                         // colorise nodes
@@ -214,9 +213,7 @@ namespace GraspVisualisations
             {
                 // transform coordinates according to T
                 octomap::point3d gripper3d{it.getCoordinate()};
-                Eigen::Vector3f coord_g{gripper3d.x(), gripper3d.y(), gripper3d.z()};
-                Eigen::Vector3f coord_w{T * coord_g};
-                octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
+                octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
 
                 // colorise nodes
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d);
@@ -289,14 +286,11 @@ namespace GraspVisualisations
                 for (float z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + (float)color_tree.getResolution()/2)
                 {
                     // transform coordinates according to T
-                    Eigen::Vector3f coord_g{x,y,z};
-                    Eigen::Vector3f coord_w{T * coord_g};
-                    octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
+                    octomap::point3d gripper3d{x,y,z};
+                    octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
 
                     // search for corresponding nodes in octrees
-                    octomap::OcTreeGripperNode* gn = gripper_tree_->search(x,y,z);
-                    //std::thread th1(threaded_octree_search, std::ref(gripper_tree_), x, y, z, std::ref(gn));
-
+                    octomap::OcTreeGripperNode* gn = gripper_tree_->search(gripper3d);
                     octomap::OcTreeGraspQualityNode* tn = target_tree_->search(world3d);
 
                     // colorise nodes
@@ -363,9 +357,7 @@ namespace GraspVisualisations
         {
             // transform coordinates according to T
             octomap::point3d gripper3d{it.getCoordinate()};
-            Eigen::Vector3f coord_g{gripper3d.x(), gripper3d.y(), gripper3d.z()};
-            Eigen::Vector3f coord_w{T * coord_g};
-            octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
+            octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
 
             // colorise nodes
             octomap::ColorOcTreeNode* n = color_tree.search(world3d);

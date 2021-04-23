@@ -27,12 +27,8 @@ namespace GraspQualityMethods
 
         for (octomap::OcTreeGripper::leaf_iterator it = gripper_tree_->begin_leafs(), end=gripper_tree_->end_leafs(); it!= end; ++it)
         {
-            octomap::point3d coord{it.getCoordinate()};
-            
-            // transform coordinates according to T
-            Eigen::Vector3f coord_g{coord.x(),coord.y(),coord.z()};
-            Eigen::Vector3f coord_w{T * coord_g};
-            octomap::point3d world3d{coord_w.x(), coord_w.y(), coord_w.z()};
+            octomap::point3d gripper3d{it.getCoordinate()};
+            octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
 
             octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d);
             if (n && n->getOccupancy() > 0.5) // if target node is occupied
@@ -64,23 +60,19 @@ namespace GraspQualityMethods
         for(auto it = grasping_pairs.begin(); it != grasping_pairs.end(); ++it)
         {
             // retrieve pair coordinates
-            octomap::point3d coord_g_left_3d{it->first.getCoordinate()};
-            octomap::point3d coord_g_right_3d{it->second.getCoordinate()};
+            octomap::point3d gripper3d_left{it->first.getCoordinate()};
+            octomap::point3d gripper3d_right{it->second.getCoordinate()};
 
             // transform coordinates according to T
-            Eigen::Vector3f coord_g_left{coord_g_left_3d.x(),coord_g_left_3d.y(),coord_g_left_3d.z()};
-            Eigen::Vector3f coord_g_right{coord_g_right_3d.x(),coord_g_right_3d.y(),coord_g_right_3d.z()};
-            Eigen::Vector3f coord_w_left{T * coord_g_left};
-            Eigen::Vector3f coord_w_right{T * coord_g_right};
+            octomap::point3d world3d_left{GraspPlanningUtils::transform_point3d(T, gripper3d_left)};
+            octomap::point3d world3d_right{GraspPlanningUtils::transform_point3d(T, gripper3d_right)};
 
-            octomap::point3d coord_w_left_3d{coord_w_left.x(), coord_w_left.y(), coord_w_left.z()};
-            octomap::point3d coord_w_right_3d{coord_w_right.x(), coord_w_right.y(), coord_w_right.z()};
-            octomap::point3d direction{(coord_w_right_3d-coord_w_left_3d).normalized()}; // First to second
+            octomap::point3d direction{(world3d_right-world3d_left).normalized()}; // First to second
             octomap::point3d hit_left;
             octomap::point3d hit_right;
 
             // build histogram of angles
-            if (target_tree_->castRay(coord_w_left_3d, direction, hit_left, true)) // if occupied node was hit
+            if (target_tree_->castRay(world3d_left, direction, hit_left, true)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
                 if (n && n->getOccupancy() > 0.5) // if occupied
@@ -95,7 +87,7 @@ namespace GraspQualityMethods
                     }
                 }
             }
-            if (target_tree_->castRay(coord_w_right_3d, -direction, hit_right, true)) // if occupied node was hit
+            if (target_tree_->castRay(world3d_right, -direction, hit_right, true)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
                 if (n && n->getOccupancy() > 0.5) // if occupied

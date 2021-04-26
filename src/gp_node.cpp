@@ -1,69 +1,162 @@
 #include <cstdio>
 #include <chrono>
 #include <octomap/OcTree.h>
-//#include <Eigen/StdVector>
-//#include <Eigen/Geometry>
+#include <boost/program_options.hpp> // program cli options
+#include <boost/filesystem.hpp> // loading tree files
 
 #include "gp_engine.cpp"
 #include "gp_utils.cpp"
 
-using namespace std::chrono_literals;
+//using namespace std::chrono_literals;
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 
-std::string target_bintree_filename = "assets/bt/ENVISAT_midres.bt";
-std::string target_octree_filename = "assets/ot/ENVISAT_midres_4.ot"; // ! 4 angle discretisations
-std::string gripper_bintree_filename = "assets/bt/2F85_gripper_midres.bt";
-std::string gripper_octree_filename = "assets/ot/2F85_gripper_midres.ot";
+// declare cli options handlers
+po::options_description desc("Allowed options");
+po::variables_map vm;
 
-int main()
+int main(int argc, char *argv[])
 {   
-    // Graspable gripper BBX definition
+    // * Add CLI options
+    desc.add_options()
+    ("help", "Print this message")
+    ("global_analysis", "Perform a global graspability analysis")
+    ("local_analysis", po::value<std::vector<float>>()->multitoken(), "Perform a local analysis at a defined target 3D point {x,y,z} [m]")
+    ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-4]")
+    ("target", po::value<std::string>(), "Target tree filepath")
+    ("gripper", po::value<std::string>(), "Gripper tree filepath")
+    ("use_simple_gripper", "Use a simple gripper model instead of importing a gripper tree")
+    ;
+
+    // * Parse commandline
+    po::store(po::parse_command_line(argc,argv,desc), vm);
+    po::notify(vm);
+    if (vm.count("help") || argc == 1) // early exit for help CLI option
+    {
+        std::cout << desc << "\n";
+        return 1;
+    }
+
+    // * Initialise objects
+    // Grasp Quality Map object handle and declare gp algorithm select
+    graspQualityMap gqm{0.01};
+    unsigned int gp_algorithm_select;
+
+    // Graspable gripper BBX definition and grasping normal vector // TODO Find a way to optionally pass this as CLI args
     octomap::point3d min_point3d{-0.04,0.115,0.085}; // xyz min -0.04,0.115,0.085
     octomap::point3d max_point3d{0.04,0.145,0.102}; // xyz max 0.04,0.145,0.102
-
-    // * Initialise Grasp Quality Map object handle
-    graspQualityMap gqm{0.01};
-
-    // * Load objects
-    #define replay // bt -> import from binarytrees, ot-> from octrees (precompiled, faster), sg-> simple gripper (with ot target), replay -> Load output from previous run and analyse thoroughly
-    #ifdef bt
-    octomap::OcTree* target_tree = new octomap::OcTree(target_bintree_filename);
     octomap::point3d gripper_normal{0,1,0}; // y-axis points towards target surface normal in 2F85 gripper model
-    octomap::OcTree* gripper_tree = new octomap::OcTree(gripper_bintree_filename);
-    gqm.set_gripper_tree(gripper_tree, gripper_normal, min_point3d, max_point3d);
-    #endif
-    #ifdef ot
-    octomap::OcTreeGraspQuality* target_tree = new octomap::OcTreeGraspQuality(target_octree_filename);
-    octomap::OcTreeGripper* gripper_tree = new octomap::OcTreeGripper(gripper_octree_filename);
-    gqm.set_gripper_tree(gripper_tree);
-    #endif
-    #ifdef sg
-    octomap::OcTreeGraspQuality* target_tree = new octomap::OcTreeGraspQuality(target_octree_filename);
-    gqm.set_simple_gripper(min_point3d, max_point3d);
-    #endif
-    #ifdef replay
-    octomap::OcTreeGraspQuality* target_tree = new octomap::OcTreeGraspQuality("out_target.ot");
-    octomap::OcTreeGripper* gripper_tree = new octomap::OcTreeGripper(gripper_octree_filename);
-    gqm.set_gripper_tree(gripper_tree);
-    #endif
-    gqm.set_target_tree(target_tree);
 
-    #ifdef replay
-    // * Scratchpad to replay grasp analyses
-    octomap::point3d coord_node{-8.55646, -0.0842408, -1.43209};
-    octomap::OcTreeGraspQualityNode* node = gqm.get_target_tree()->search(coord_node);
-    octomap::OcTreeGraspQuality::iterator node_it{GraspPlanningUtils::nodeToIterator(node, gqm.get_target_tree())};
-    Eigen::Affine3f T{gqm.analyse_local_grasp_quality(node_it, 0)};
-    gqm.write_grasp_visualisations(T);
-    return 0;
-    #endif
+    // * Parse CLI args
+    if (vm.count("target"))
+    {
+        std::string target_filepath{vm["target"].as<std::string>()};
+        if (fs::exists(target_filepath) && fs::is_regular_file(target_filepath))
+        {
+            if (fs::extension(target_filepath) == ".bt")
+            {
+                octomap::OcTree* target_tree = new octomap::OcTree(target_filepath);
+                gqm.set_target_tree(target_tree); 
+            }
+            else if (fs::extension(target_filepath) == ".ot")
+            {
+                octomap::OcTreeGraspQuality* target_tree = new octomap::OcTreeGraspQuality(target_filepath);
+                gqm.set_target_tree(target_tree);
+            }
+            else
+            {
+                std::cerr << "Invalid target tree file extension '" << fs::extension(target_filepath) << "'" << std::endl;
+                return 1;
+            }
+        }
+        else
+        {
+            std::cerr << "Provided target tree filepath does not exist or is not a regular file" << std::endl;
+            return 1;
+        }
+    }
+    else
+    {
+        std::cerr << "Missing required 'target' CLI option" << std::endl;
+        return 1;
+    }
+    if (vm.count("gripper") || vm.count("use_simple_gripper"))
+    {
+        if (vm.count("use_simple_gripper"))
+        {
+            gqm.set_simple_gripper(min_point3d, max_point3d);
+        }
+        else
+        {
+            std::string gripper_filepath{vm["gripper"].as<std::string>()};
+            if (fs::exists(gripper_filepath) && fs::is_regular_file(gripper_filepath))
+            {
+                if (fs::extension(gripper_filepath) == ".bt")
+                {
+                    octomap::OcTree* gripper_tree = new octomap::OcTree(gripper_filepath);
+                    gqm.set_gripper_tree(gripper_tree, gripper_normal, min_point3d, max_point3d);
+                }
+                else if (fs::extension(gripper_filepath) == ".ot")
+                {
+                    octomap::OcTreeGripper* gripper_tree = new octomap::OcTreeGripper(gripper_filepath);
+                    gqm.set_gripper_tree(gripper_tree);
+                }
+                else
+                {
+                    std::cerr << "Invalid gripper tree file extension '" << fs::extension(gripper_filepath) << "'" << std::endl;
+                    return 1;
+                }
+            }
+            else
+            {
+                std::cerr << "Provided gripper tree filepath does not exist or is not a regular file" << std::endl;
+                return 1;
+            }
+        }
+    }
+    else
+    {
+        std::cerr << "Must use either 'gripper' or 'use_simple_gripper' CLI options" << std::endl;
+        return 1;
+    }
+    if (vm.count("gp_algorithm"))
+    {
+        gp_algorithm_select = vm["gp_algorithm"].as<unsigned int>();
+    }
+    else
+    {
+        std::cerr << "Must provide option 'gp_algorithm'" << std::endl;
+        return 1;
+    }
+    if (vm.count("global_analysis"))
+    {
+        gqm.analyse_global_grasp_quality(gp_algorithm_select);
 
-    gqm.analyse_global_grasp_quality(0);
+        // Write results to file
+        gqm.get_target_tree()->writeGraspQualityHistogram("gq_histogram");
+        gqm.get_target_tree()->write("out_target.ot");
+        gqm.get_gripper_tree()->write("out_gripper.ot");
+        ((octomap::ColorOcTree)*gqm.get_target_tree()).write("out_color_target.ot");
+        ((octomap::ColorOcTree)*gqm.get_gripper_tree()).write("out_color_gripper.ot");
 
-    // * Output results
-    gqm.get_target_tree()->writeGraspQualityHistogram("gq_histogram");
-    gqm.get_target_tree()->write("out_target.ot");
-    ((octomap::ColorOcTree)*gqm.get_target_tree()).write("out_color_target.ot");
-    //((octomap::ColorOcTree)*gqm.get_gripper_tree()).write("gripperColor.ot");
+    }
+    if (vm.count("local_analysis"))
+    {
+        std::vector<float> vf = vm["local_analysis"].as<std::vector<float>>();
+        if (vf.size() != 3)
+        {
+            std::cerr << "3D coordinates incorrectly parsed. Use {x,y,z} without spaces (i.e. {-1.23,4.0,49}" << std::endl;
+            return 1;
+        }
+        octomap::point3d coord_node; // a good point is {-8.55646, -0.0842408, -1.43209};
+        coord_node.x() = vf[0];
+        coord_node.y() = vf[1];
+        coord_node.z() = vf[2];
+        octomap::OcTreeGraspQualityNode* node = gqm.get_target_tree()->search(coord_node);
+        octomap::OcTreeGraspQuality::iterator node_it{GraspPlanningUtils::nodeToIterator(node, gqm.get_target_tree())};
+        Eigen::Affine3f T{gqm.analyse_local_grasp_quality(node_it, gp_algorithm_select)};
+        gqm.write_grasp_visualisations(T);
+    }
 
     return 0;
 }

@@ -14,10 +14,10 @@
 //#include <deque> // std::deque
 
 // Grasp planning algorithms definitions
-#define GP_ONLYVOXELSUPERIMPOSITION 0 // Simply count the number of voxels within the graspable region that collide with voxels from the target
-#define GP_ONLYSURFACENORMALS 1 // Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
-#define GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS 2 // 0 and 1 methods combined
-#define GP_RAYCASTINGANTIPODALPLANES 3 // Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
+#define GP_ONLYVOXELSUPERIMPOSITION 1 // Simply count the number of voxels within the graspable region that collide with voxels from the target
+#define GP_ONLYSURFACENORMALS 2 // Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
+#define GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS 3 // 1 and 2 methods combined
+#define GP_RAYCASTINGANTIPODALPLANES 4 // Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
 
 class graspQualityMap
 {

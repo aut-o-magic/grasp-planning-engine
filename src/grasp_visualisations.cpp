@@ -195,7 +195,7 @@ namespace GraspVisualisations
                             
                         }
                         else continue;
-                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, gn->getLogOdds());
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, log_odds);
                         n->setColor(color);
                     }
                 }

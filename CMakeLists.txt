@@ -25,9 +25,11 @@ include_directories(
 # Octomap imports
 find_package(octomap REQUIRED)
 find_package(octomap_grasping REQUIRED)
+find_package(Boost REQUIRED COMPONENTS program_options filesystem)
 include_directories(
 ${OCTOMAP_INCLUDE_DIRS}
 ${octomap_grasping_INCLUDE_DIRS}
+${Boost_INCLUDE_DIRS}
 )
 
 add_library(gp_engine src/gp_engine.cpp)
@@ -70,6 +72,7 @@ target_link_libraries(gp_node
 ${OCTOMAP_LIBRARIES}
 ${octomap_grasping_LIBRARIES}
 gp_engine
+${Boost_LIBRARIES}
 )
 
 install(TARGETS gp_node

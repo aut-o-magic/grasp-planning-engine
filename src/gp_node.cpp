@@ -77,10 +77,10 @@ int main(int argc, char *argv[])
     }
     else
     {
-        std::cerr << "Missing required 'target' CLI option" << std::endl;
+        std::cerr << "Missing required '--target' CLI option" << std::endl;
         return 1;
     }
-    if (vm.count("gripper") || vm.count("use_simple_gripper"))
+    if ((vm.count("gripper") + vm.count("use_simple_gripper")) == 1) // if and only if one option called exactly once
     {
         if (vm.count("use_simple_gripper"))
         {
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        std::cerr << "Must use either 'gripper' or 'use_simple_gripper' CLI options" << std::endl;
+        std::cerr << "Must use either '--gripper' or '--use_simple_gripper' CLI options" << std::endl;
         return 1;
     }
     if (vm.count("gp_algorithm"))
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        std::cerr << "Must provide option 'gp_algorithm'" << std::endl;
+        std::cerr << "Must provide option '--gp_algorithm'" << std::endl;
         return 1;
     }
     if (vm.count("global_analysis"))
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
         std::vector<float> vf = vm["local_analysis"].as<std::vector<float>>();
         if (vf.size() != 3)
         {
-            std::cerr << "3D coordinates incorrectly parsed. Use {x,y,z} without spaces (i.e. {-1.23,4.0,49}" << std::endl;
+            std::cerr << "3D coordinates incorrectly parsed. Use {x,y,z} without spaces (i.e. {-1.23,4.0,49})" << std::endl;
             return 1;
         }
         octomap::point3d coord_node; // a good point is {-8.55646, -0.0842408, -1.43209};

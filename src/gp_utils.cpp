@@ -124,10 +124,8 @@ namespace GraspPlanningUtils
      * @param tree Gripper octree ptr
      * @returns Vector of node iterator pairs
      */
-    static std::vector<std::pair<octomap::OcTreeGripper::iterator,octomap::OcTreeGripper::iterator>> graspingPairs(const std::string axes, octomap::OcTreeGripper* tree)
+    static std::vector<std::pair<octomap::OcTreeGripper::iterator,octomap::OcTreeGripper::iterator>> graspingPairs(const std::string axes, const octomap::OcTreeGripper* tree)
     {
-        tree->expand(); // Requires the tree to be expanded for complete results
-
         std::vector<std::pair<octomap::OcTreeGripper::iterator, octomap::OcTreeGripper::iterator>> vector_pair{};
         // verify formatting correctness of input axes
         if (axes.length() != 2)

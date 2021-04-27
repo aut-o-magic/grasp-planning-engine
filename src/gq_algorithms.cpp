@@ -17,13 +17,11 @@ namespace GraspQualityMethods
      * @returns Normalised grasp quality score between [0,1]
      * ? Alternative approach would be with computeRay(). May be much faster?
      */
-    static float gq_voxelsuperimposition(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_)
+    static float gq_voxelsuperimposition(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
         float score{0};
         float reward{1}; // reward for positive node interaction
         float penalty{1}; // penalty for negative node interaction
-
-        gripper_tree_->expand(); // expand to standardise the size of all voxels in score counting
 
         for (octomap::OcTreeGripper::leaf_iterator it = gripper_tree_->begin_leafs(), end=gripper_tree_->end_leafs(); it!= end; ++it)
         {
@@ -50,7 +48,7 @@ namespace GraspQualityMethods
      * TODO algorithm
      * TODO avoid hardcoding grasping plane here, in graspingPairs fcn call
      */
-    static float gq_surfacenormals(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_)
+    static float gq_surfacenormals(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
         if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
 
@@ -123,7 +121,7 @@ namespace GraspQualityMethods
      * @param voxel_normal_ratio Percentage (in 1 scale) weight given to voxel superimposition method against surface normal method
      * TODO find a way to pass weight ratio
      */
-    static float gq_voxelsuperimposition_surfacenormals(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_)//, float voxel_normal_ratio = 0.5)
+    static float gq_voxelsuperimposition_surfacenormals(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)//, float voxel_normal_ratio = 0.5)
     {
         float voxel_normal_ratio{0.5};
         float score{gq_voxelsuperimposition(T, target_tree_, gripper_tree_) * voxel_normal_ratio + gq_surfacenormals(T, target_tree_, gripper_tree_) * (1-voxel_normal_ratio)};
@@ -138,7 +136,7 @@ namespace GraspQualityMethods
      * @returns Normalised grasp quality score between [0,1]
      * TODO algorithm
      */
-    static float gq_raycasting(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_)
+    static float gq_raycasting(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
         float score{0};
 

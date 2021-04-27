@@ -176,7 +176,7 @@ namespace GraspVisualisations
                         float log_odds;
                         if (gn) // if gripper node present
                         {
-                            if (tn && tn->getOccupancy() > 0.5) // if target node is occupied
+                            if (tn && target_tree_->isNodeOccupied(tn)) // if target node is occupied
                             {
                                 log_odds = tn->getLogOdds();
                                 if (gn->isGraspingSurface()) color.g = 255;
@@ -219,7 +219,7 @@ namespace GraspVisualisations
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d);
                 octomap::ColorOcTreeNode::Color color{0,0,0};
                 float log_odds;
-                if (n && n->getOccupancy() > 0.5) // if target has an occupied node in that location
+                if (n && target_tree_->isNodeOccupied(n)) // if target has an occupied node in that location
                 {
                     log_odds = n->getLogOdds();
                     if (it->isGraspingSurface()) color.g = 255;
@@ -362,7 +362,7 @@ namespace GraspVisualisations
             // colorise nodes
             octomap::ColorOcTreeNode* n = color_tree.search(world3d);
             octomap::ColorOcTreeNode::Color color{0,0,0};
-            if (n && n->getOccupancy() > 0.5) // if occupied
+            if (n && color_tree.isNodeOccupied(n)) // if occupied
             {
                 int color_b_node{n->getColor().b};
                 if (0 < color_b_node && color_b_node < 255) // if node is blue but not _fully_ blue (255b is associated with gripper-only nodes)

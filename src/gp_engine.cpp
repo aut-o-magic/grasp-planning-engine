@@ -56,7 +56,7 @@ public:
                     }
                     else // If node exists
                     {
-                        if (n->getOccupancy() < 0.5) // if node is free
+                        if (!gripper_tree_->isNodeOccupied(n)) // if node is free
                             n->setLogOdds(this->gripper_tree_->getProbHitLog());
                         n->setIsGraspingSurface(false);
                     }

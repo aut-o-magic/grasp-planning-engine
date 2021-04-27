@@ -29,7 +29,7 @@ namespace GraspQualityMethods
             octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
 
             octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d);
-            if (n && n->getOccupancy() > 0.5) // if target node is occupied
+            if (n && target_tree_->isNodeOccupied(n)) // if target node is occupied
             {
                 if(it->isGraspingSurface()) score += reward;
                 else score -= penalty;
@@ -73,7 +73,7 @@ namespace GraspQualityMethods
             if (target_tree_->castRay(world3d_left, direction, hit_left, true)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
-                if (n && n->getOccupancy() > 0.5) // if occupied
+                if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
                     octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
@@ -88,7 +88,7 @@ namespace GraspQualityMethods
             if (target_tree_->castRay(world3d_right, -direction, hit_right, true)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
-                if (n && n->getOccupancy() > 0.5) // if occupied
+                if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
                     octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)

@@ -119,14 +119,14 @@ int main(int argc, char *argv[])
         std::cerr << "Must use either '--gripper' or '--use_simple_gripper' CLI options" << std::endl;
         return 1;
     }
-    if (vm.count("gp_algorithm"))
+    if ((vm.count("global_analysis") + vm.count("local_analysis")) >= 1) // gp_algorithm must be provided if a grasp analysis option is used
     {
-        gp_algorithm_select = vm["gp_algorithm"].as<unsigned int>();
-    }
-    else
-    {
-        std::cerr << "Must provide option '--gp_algorithm'" << std::endl;
-        return 1;
+        if (vm.count("gp_algorithm")) gp_algorithm_select = vm["gp_algorithm"].as<unsigned int>();
+        else
+        {
+            std::cerr << "Must provide option '--gp_algorithm'" << std::endl;
+            return 1;
+        }
     }
     if (vm.count("global_analysis"))
     {

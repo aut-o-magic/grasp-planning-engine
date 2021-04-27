@@ -12,7 +12,7 @@ namespace GraspPlanningUtils
      * @param point3d Point3d to transform
      * @returns Transformed point3d
      */
-    static octomap::point3d transform_point3d(const Eigen::Affine3f& T, const octomap::point3d& point3d)
+    inline octomap::point3d transform_point3d(const Eigen::Affine3f& T, const octomap::point3d& point3d)
     {
         Eigen::Vector3f coord_0{point3d.x(), point3d.y(), point3d.z()};
         Eigen::Vector3f coord_1{T * coord_0};
@@ -25,7 +25,7 @@ namespace GraspPlanningUtils
      * @param query 3D point being queried
      * @param node corresponding octree node
      */
-    static void print_query_info(const octomap::point3d& query, const octomap::OcTreeNode* node)
+    inline void print_query_info(const octomap::point3d& query, const octomap::OcTreeNode* node)
     {
         if (node) // if not NULL
         {
@@ -41,7 +41,7 @@ namespace GraspPlanningUtils
      * @param __vector2 Second vector
      * @returns Max composite vector
      */
-    static octomap::point3d max_composite_vector(const octomap::point3d& __vector1, const octomap::point3d& __vector2)
+    inline octomap::point3d max_composite_vector(const octomap::point3d& __vector1, const octomap::point3d& __vector2)
     {
         octomap::point3d output;
         for (unsigned int i=0; i<3; ++i)
@@ -57,7 +57,7 @@ namespace GraspPlanningUtils
      * @param __vector2 Second vector
      * @returns Min composite vector
      */
-    static octomap::point3d min_composite_vector(const octomap::point3d& __vector1, const octomap::point3d& __vector2)
+    inline octomap::point3d min_composite_vector(const octomap::point3d& __vector1, const octomap::point3d& __vector2)
     {
         octomap::point3d output;
         for (unsigned int i=0; i<3; ++i)
@@ -74,7 +74,7 @@ namespace GraspPlanningUtils
      * @returns Collection of surface normals normalised vectors
      */
     template<typename NODE>
-    static octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d)
+    inline octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d)
     {
         const double angle_threshold_same_vector = 0.01; // rad (0.01rad = 0.573deg) // TODO set to a meaningful value
         octomap::point3d_collection normals;
@@ -109,7 +109,7 @@ namespace GraspPlanningUtils
      * @returns Octree iterator pointing to the provided node
      */
     template<typename NODE>
-    static typename octomap::OccupancyOcTreeBase<NODE>::iterator nodeToIterator(const NODE* node, const octomap::OccupancyOcTreeBase<NODE>* tree)
+    inline typename octomap::OccupancyOcTreeBase<NODE>::iterator nodeToIterator(const NODE* node, const octomap::OccupancyOcTreeBase<NODE>* tree)
     {
         for (typename octomap::OccupancyOcTreeBase<NODE>::leaf_iterator it = tree->begin_leafs(), end = tree->end_leafs(); it != end; ++it)
         {
@@ -124,7 +124,7 @@ namespace GraspPlanningUtils
      * @param tree Gripper octree ptr
      * @returns Vector of node iterator pairs
      */
-    static std::vector<std::pair<octomap::OcTreeGripper::iterator,octomap::OcTreeGripper::iterator>> graspingPairs(const std::string axes, const octomap::OcTreeGripper* tree)
+    inline std::vector<std::pair<octomap::OcTreeGripper::iterator,octomap::OcTreeGripper::iterator>> graspingPairs(const std::string axes, const octomap::OcTreeGripper* tree)
     {
         std::vector<std::pair<octomap::OcTreeGripper::iterator, octomap::OcTreeGripper::iterator>> vector_pair{};
         // verify formatting correctness of input axes

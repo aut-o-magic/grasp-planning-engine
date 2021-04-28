@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
         gqm.analyse_global_grasp_quality(gp_algorithm_select);
 
         // Write results to file
-        gqm.get_target_tree()->writeGraspQualityHistogram("gq_histogram");
+        gqm.get_target_tree()->writeGraspQualityHistogram("out_gq_histogram");
         gqm.get_target_tree()->write("out_target.ot");
         gqm.get_gripper_tree()->write("out_gripper.ot");
         ((octomap::ColorOcTree)*gqm.get_target_tree()).write("out_color_target.ot");
@@ -161,11 +161,11 @@ int main(int argc, char *argv[])
     }
     if (vm.count("write_color_target"))
     {
-        ((octomap::ColorOcTree)*gqm.get_target_tree()).write("colortarget.ot");
+        ((octomap::ColorOcTree)*gqm.get_target_tree()).write("colortree_target.ot");
     }
     if (vm.count("write_color_gripper"))
     {
-        ((octomap::ColorOcTree)*gqm.get_gripper_tree()).write("colorgripper.ot");
+        ((octomap::ColorOcTree)*gqm.get_gripper_tree()).write("colortree_gripper.ot");
     }
 
     return 0;

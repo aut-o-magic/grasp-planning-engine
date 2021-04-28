@@ -37,8 +37,8 @@ public:
         octomap::point3d grasping_normal{0,1,0}; // Normal direction for gripping is {0,1,0}
         this->gripper_tree_->setGraspingNormal(grasping_normal);
         const double res{this->gripper_tree_->getResolution()};
-        const octomap::point3d min_shell{min_point3d - octomap::point3d(res,res+res,0)};
-        const octomap::point3d max_shell{max_point3d + octomap::point3d(res+res,0,0)};
+        const octomap::point3d min_shell{min_point3d - octomap::point3d(res,res,0)};
+        const octomap::point3d max_shell{max_point3d + octomap::point3d(res,0,0)};
         octomap::OcTreeKey minKey{};
         octomap::OcTreeKey maxKey{};
         gripper_tree_->coordToKeyChecked(min_shell, minKey);

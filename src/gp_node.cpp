@@ -155,6 +155,11 @@ int main(int argc, char *argv[])
         coord_node.y() = vf[1];
         coord_node.z() = vf[2];
         octomap::OcTreeGraspQualityNode* node = gqm.get_target_tree()->search(coord_node);
+        if (!node) // if null ptr exit
+        {
+            std::cerr << "[local_analysis] Error: Point " << coord_node << " not in target tree.\n Exiting..." << std::endl;
+            return -1;
+        }
         octomap::OcTreeGraspQuality::iterator node_it{GraspPlanningUtils::nodeToIterator(node, gqm.get_target_tree())};
         Eigen::Affine3f T{gqm.analyse_local_grasp_quality(node_it, gp_algorithm_select)};
         gqm.write_grasp_visualisations(T);

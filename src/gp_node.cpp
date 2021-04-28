@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
     desc.add_options()
     ("help", "Print this message")
     ("global_analysis", "Perform a global graspability analysis")
-    ("local_analysis", po::value<std::vector<float>>()->multitoken(), "Perform a local analysis at a defined target 3D point {x,y,z} [m]")
+    ("local_analysis", po::value<std::vector<float>>(), "Perform a local analysis at a defined target 3D point. Pass arg with no spaces and with equal sign (i.e. --local_analysis={x,y,z}) [m]")
     ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-4]")
     ("target", po::value<std::string>(), "Target tree filepath")
     ("gripper", po::value<std::string>(), "Gripper tree filepath")
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
         std::vector<float> vf = vm["local_analysis"].as<std::vector<float>>();
         if (vf.size() != 3)
         {
-            std::cerr << "3D coordinates incorrectly parsed. Use {x,y,z} without spaces (i.e. {-1.23,4.0,49})" << std::endl;
+            std::cerr << "3D coordinates incorrectly parsed. Use {x,y,z} without spaces (i.e. --local_analysis={-1.23,4.0,-49})" << std::endl;
             return 1;
         }
         octomap::point3d coord_node; // a good point is {-8.55646, -0.0842408, -1.43209};

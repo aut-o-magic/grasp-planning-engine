@@ -26,6 +26,8 @@ int main(int argc, char *argv[])
     ("target", po::value<std::string>(), "Target tree filepath")
     ("gripper", po::value<std::string>(), "Gripper tree filepath")
     ("use_simple_gripper", "Use a simple gripper model instead of importing a gripper tree")
+    ("write_color_target", "Write to file ColorOcTree version of target octree")
+    ("write_color_gripper", "Write to file ColorOcTree version of gripper octree")
     ;
 
     // * Parse commandline
@@ -75,7 +77,7 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    else
+    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_color_target")) // if target required, raise error
     {
         std::cerr << "Missing required '--target' CLI option" << std::endl;
         return 1;
@@ -114,7 +116,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-    else
+    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_color_gripper")) // if gripper required, raise error
     {
         std::cerr << "Must use either '--gripper' or '--use_simple_gripper' CLI options" << std::endl;
         return 1;
@@ -156,6 +158,14 @@ int main(int argc, char *argv[])
         octomap::OcTreeGraspQuality::iterator node_it{GraspPlanningUtils::nodeToIterator(node, gqm.get_target_tree())};
         Eigen::Affine3f T{gqm.analyse_local_grasp_quality(node_it, gp_algorithm_select)};
         gqm.write_grasp_visualisations(T);
+    }
+    if (vm.count("write_color_target"))
+    {
+        ((octomap::ColorOcTree)*gqm.get_target_tree()).write("colortarget.ot");
+    }
+    if (vm.count("write_color_gripper"))
+    {
+        ((octomap::ColorOcTree)*gqm.get_gripper_tree()).write("colorgripper.ot");
     }
 
     return 0;

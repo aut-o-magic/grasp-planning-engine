@@ -103,17 +103,22 @@ namespace GraspPlanningUtils
     }
 
     /**
-     * Utility that type casts an octree node to its corresponding iterator
-     * @param node Octree node ptr
+     * Utility that searches 3d coordinates within tree to provide its corresponding iterator ptr, similar to the member fcn search() that returns the node ptr. Time complexity of O(n), do not overuse.
+     * @param coord 3D coordinates to search
      * @param tree Octree ptr
-     * @returns Octree iterator pointing to the provided node
+     * @returns Octree iterator pointing to the node populating the provided coordinates. Returns NULL if no node is in the coordinates
      */
     template<typename NODE>
-    inline typename octomap::OccupancyOcTreeBase<NODE>::iterator nodeToIterator(const NODE* node, const octomap::OccupancyOcTreeBase<NODE>* tree)
+    inline typename octomap::OccupancyOcTreeBase<NODE>::iterator searchIterator(const octomap::point3d &coord, const octomap::OccupancyOcTreeBase<NODE>* tree)
     {
+        NODE* node = tree->search(coord);
+        if (!node) return NULL; // return null if node is unknown
         for (typename octomap::OccupancyOcTreeBase<NODE>::leaf_iterator it = tree->begin_leafs(), end = tree->end_leafs(); it != end; ++it)
         {
-            if(*it == *node) return it;
+            if (&(*it) == node) // if ptrs point to the same memory address, they are the same node
+            {
+                return it;
+            }
         }
         return NULL;
     }

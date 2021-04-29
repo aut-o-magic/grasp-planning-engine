@@ -130,6 +130,7 @@ public:
         std::cout << "[set_gripper_tree] started..." << std::endl;
         this->gripper_tree_ = octree;
         this->gripper_tree_->expand();
+        this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
     }
 
     /**
@@ -146,6 +147,7 @@ public:
         octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
         this->gripper_tree_->setOrigin(grasp_center_point);
         this->gripper_tree_->expand();
+        this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
     }
 
     const octomap::OcTreeGripper* get_gripper_tree() const {return gripper_tree_;}

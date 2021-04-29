@@ -211,7 +211,7 @@ namespace GraspVisualisations
                 octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
 
                 // colorise nodes
-                octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d,16U);
+                octomap::OcTreeGraspQualityNode* n = target_tree_->search(world3d);
                 octomap::ColorOcTreeNode::Color color{0,0,0};
                 float log_odds;
                 if (n && target_tree_->isNodeOccupied(n)) // if target has an occupied node in that location

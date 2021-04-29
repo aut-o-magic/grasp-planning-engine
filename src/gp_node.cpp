@@ -19,15 +19,17 @@ int main(int argc, char *argv[])
 {   
     // * Add CLI options
     desc.add_options()
-    ("help", "Print this message")
-    ("global_analysis", "Perform a global graspability analysis")
-    ("local_analysis", po::value<std::vector<float>>(), "Perform a local analysis at a defined target 3D point. Pass arg with no spaces and with equal sign (i.e. --local_analysis={x,y,z}) [m]")
-    ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-4]")
+    ("help", "Print this message. Options declared will be serially executed in the order listed here")
     ("target", po::value<std::string>(), "Target tree filepath")
     ("gripper", po::value<std::string>(), "Gripper tree filepath")
     ("use_simple_gripper", "Use a simple gripper model instead of importing a gripper tree")
-    ("write_color_target", "Write to file ColorOcTree version of target octree")
-    ("write_color_gripper", "Write to file ColorOcTree version of gripper octree")
+    ("write_target", po::value<std::string>()->implicit_value("target.ot"), "Write target octree to file")
+    ("write_gripper", po::value<std::string>()->implicit_value("gripper.ot"), "Write gripper octree to file")
+    ("write_color_target", po::value<std::string>()->implicit_value("colortree_target.ot"), "Write to file ColorOcTree version of target octree")
+    ("write_color_gripper", po::value<std::string>()->implicit_value("colortree_gripper.ot"), "Write to file ColorOcTree version of gripper octree")
+    ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-4]")
+    ("global_analysis", "Perform a global graspability analysis")
+    ("local_analysis", po::value<std::vector<float>>(), "Perform a local analysis at a defined target 3D point. Pass arg with no spaces and with equal sign (i.e. --local_analysis={x,y,z}) [m]")
     ;
 
     // * Parse commandline
@@ -49,7 +51,8 @@ int main(int argc, char *argv[])
     octomap::point3d max_point3d{0.04,0.145,0.102}; // xyz max 0.04,0.145,0.102
     octomap::point3d gripper_normal{0,1,0}; // y-axis points towards target surface normal in 2F85 gripper model
 
-    // * Parse CLI args
+    // *** Parse CLI args
+    // * Options for loading objects to memory
     if (vm.count("target"))
     {
         std::string target_filepath{vm["target"].as<std::string>()};
@@ -77,18 +80,14 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_color_target")) // if target required, raise error
+    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_target") || vm.count("write_color_target")) // if target required, raise error
     {
         std::cerr << "Missing required '--target' CLI option" << std::endl;
         return 1;
     }
     if ((vm.count("gripper") + vm.count("use_simple_gripper")) == 1) // if and only if one option called exactly once
     {
-        if (vm.count("use_simple_gripper"))
-        {
-            gqm.set_simple_gripper(min_point3d, max_point3d);
-        }
-        else
+        if (vm.count("gripper"))
         {
             std::string gripper_filepath{vm["gripper"].as<std::string>()};
             if (fs::exists(gripper_filepath) && fs::is_regular_file(gripper_filepath))
@@ -115,12 +114,44 @@ int main(int argc, char *argv[])
                 return 1;
             }
         }
+        else
+        {
+            gqm.set_simple_gripper(min_point3d, max_point3d);
+        }
     }
-    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_color_gripper")) // if gripper required, raise error
+    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_gripper") || vm.count("write_color_gripper")) // if gripper required, raise error
     {
         std::cerr << "Must use either '--gripper' or '--use_simple_gripper' CLI options" << std::endl;
         return 1;
     }
+        
+    // * Options for writing objects to file
+    if (vm.count("write_target"))
+    {
+        std::string filepath{vm["write_target"].as<std::string>()};
+        if (fs::extension(filepath) != ".ot") filepath += ".ot";
+        gqm.get_target_tree()->write(filepath);
+    }
+    if (vm.count("write_gripper"))
+    {
+        std::string filepath{vm["write_gripper"].as<std::string>()};
+        if (fs::extension(filepath) != ".ot") filepath += ".ot";
+        gqm.get_gripper_tree()->write(filepath);
+    }
+    if (vm.count("write_color_target"))
+    {
+        std::string filepath{vm["write_color_target"].as<std::string>()};
+        if (fs::extension(filepath) != ".ot") filepath += ".ot";
+        ((octomap::ColorOcTree)*gqm.get_target_tree()).write(filepath);
+    }
+    if (vm.count("write_color_gripper"))
+    {
+        std::string filepath{vm["write_color_gripper"].as<std::string>()};
+        if (fs::extension(filepath) != ".ot") filepath += ".ot";
+        ((octomap::ColorOcTree)*gqm.get_gripper_tree()).write(filepath);
+    }
+
+    // * Options for analysing graspability
     if ((vm.count("global_analysis") + vm.count("local_analysis")) >= 1) // gp_algorithm must be provided if a grasp analysis option is used
     {
         if (vm.count("gp_algorithm")) gp_algorithm_select = vm["gp_algorithm"].as<unsigned int>();
@@ -154,24 +185,14 @@ int main(int argc, char *argv[])
         coord_node.x() = vf[0];
         coord_node.y() = vf[1];
         coord_node.z() = vf[2];
-        octomap::OcTreeGraspQualityNode* node = gqm.get_target_tree()->search(coord_node);
-        if (!node) // if null ptr exit
+        octomap::OcTreeGraspQuality::iterator node_it{GraspPlanningUtils::searchIterator(coord_node, gqm.get_target_tree())};
+        if (node_it == NULL) // if null ptr exit
         {
             std::cerr << "[local_analysis] Error: Point " << coord_node << " not in target tree.\n Exiting..." << std::endl;
             return -1;
         }
-        octomap::OcTreeGraspQuality::iterator node_it{GraspPlanningUtils::nodeToIterator(node, gqm.get_target_tree())};
         Eigen::Affine3f T{gqm.analyse_local_grasp_quality(node_it, gp_algorithm_select)};
         gqm.write_grasp_visualisations(T);
     }
-    if (vm.count("write_color_target"))
-    {
-        ((octomap::ColorOcTree)*gqm.get_target_tree()).write("colortree_target.ot");
-    }
-    if (vm.count("write_color_gripper"))
-    {
-        ((octomap::ColorOcTree)*gqm.get_gripper_tree()).write("colortree_gripper.ot");
-    }
-
     return 0;
 }

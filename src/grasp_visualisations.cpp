@@ -81,7 +81,7 @@ namespace GraspVisualisations
      * Density color coding: white = 0, red = 1, green = 2, blue = 3, black => 4
      * @param target_tree_ Target object octree
      */
-    inline void visualise_surface_normals_density(octomap::OcTreeGraspQuality* target_tree_)
+    inline void visualise_surface_normals_density(const octomap::OcTreeGraspQuality* target_tree_)
     {
         std::cout << "[visualise_surface_normals_density] started..." << std::endl;
         octomap::ColorOcTree color_tree_normals_density{target_tree_->getResolution()};
@@ -90,9 +90,6 @@ namespace GraspVisualisations
         unsigned int normal2{0};
         unsigned int normal3{0};
         unsigned int normal3plus{0};
-
-        // expand target_tree for complete analysis
-        target_tree_->expand();
 
         for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_->begin_leafs(), end=target_tree_->end_leafs(); it!= end; ++it)
         {
@@ -129,7 +126,7 @@ namespace GraspVisualisations
      * @param BBX_margin Add additional margins to the BBX drawn for better occupancy context
      * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
      */
-    inline octomap::ColorOcTree visualise_local_grasp(octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_, bool show_target_voxels = false, const Eigen::Affine3f& T = Eigen::Affine3f::Identity(), float BBX_margin = 0)
+    inline octomap::ColorOcTree visualise_local_grasp(const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_, bool show_target_voxels = false, const Eigen::Affine3f& T = Eigen::Affine3f::Identity(), float BBX_margin = 0)
     {
         //#define ALWAYS_CARTESIAN_BBX_METHOD 
         // ndef-> Use Node ptr iteration (faster) when target voxels don't have to be shown,
@@ -205,9 +202,6 @@ namespace GraspVisualisations
         else
         {
             // *** Method 1 *** Iterate over octree node ptrs, does not support showing target voxels
-
-            gripper_tree_->expand();
-
             // iterate over gripper octree
             for (octomap::OcTreeGripper::leaf_iterator it = gripper_tree_->begin_leafs(), end=gripper_tree_->end_leafs(); it!= end; ++it)
             {
@@ -248,7 +242,7 @@ namespace GraspVisualisations
      * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
      * TODO Make multithreaded search execution in method 0 work
      */
-    inline octomap::ColorOcTree visualise_global_grasp(octomap::OcTreeGraspQuality* target_tree_, octomap::OcTreeGripper* gripper_tree_, const Eigen::Affine3f& T = Eigen::Affine3f::Identity())
+    inline octomap::ColorOcTree visualise_global_grasp(const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_, const Eigen::Affine3f& T = Eigen::Affine3f::Identity())
     {
         std::cout << "[visualise_global_grasp] started..." << std::endl;
         #define ITERATION_METHOD 1 // 0 = spatial iteration, 1 = octree nodes iteration
@@ -336,10 +330,6 @@ namespace GraspVisualisations
 
         #if ITERATION_METHOD==1
         // *** Method 1 *** Iterate over both octree nodes
-
-        target_tree_->expand();
-        gripper_tree_->expand();
-
         // iterate over target octree
         for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_->begin_leafs(), end=target_tree_->end_leafs(); it!= end; ++it)
         {

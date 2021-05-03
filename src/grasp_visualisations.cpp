@@ -247,92 +247,10 @@ namespace GraspVisualisations
     inline octomap::ColorOcTree visualise_global_grasp(const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_, const Eigen::Affine3f& T = Eigen::Affine3f::Identity())
     {
         std::cout << "[visualise_global_grasp] started..." << std::endl;
-        #define ITERATION_METHOD 1 // 0 = spatial iteration, 1 = octree nodes iteration
         octomap::ColorOcTree color_tree{std::max(target_tree_->getResolution(),gripper_tree_->getResolution())};
         octomap::point3d origin_offset{T.translation().x(), T.translation().y(), T.translation().z()}; // origin of color_tree will be offset by this amount to focus on gripper
-
-        #if ITERATION_METHOD==0
-        // *** Method 0 *** Spatial BBX iteration
-        // set scene BBX
-        double xt, xg, yt, yg, zt, zg;
-        target_tree_->getMetricMax(xt,yt,zt);
-        gripper_tree_->getMetricMax(xg,yg,zg);
-        octomap::point3d max_bbx{(float)std::max(xt,xg), (float)std::max(yt, yg), (float)std::max(zt, zg)};
-        target_tree_->getMetricMin(xt,yt,zt);
-        gripper_tree_->getMetricMin(xg,yg,zg);
-        octomap::point3d min_bbx{(float)std::min(xt,xg), (float)std::min(yt, yg), (float)std::min(zt, zg)};
-        color_tree.setBBXMax(max_bbx);
-        color_tree.setBBXMin(min_bbx);
-
-        // ? Comment out/remove cout
-        std::cout << "Resolution target: " << target_tree_->getResolution() << ", resolution gripper: " << gripper_tree_->getResolution() << ", color tree resolution: " << color_tree.getResolution() << std::endl;
-        std::cout << "minBBX: " << min_bbx << std::endl;
-        std::cout << "maxBBX: " << max_bbx << std::endl;
-        std::cout << "MetricSize: " << color_tree.getBBXBounds() << std::endl;
         
-        // set up variables for progress tracking
-        //unsigned int total_x_steps{(color_tree.getBBXMax().x() - color_tree.getBBXMin().x()) / color_tree.getResolution()/2};
-        unsigned int current_x_step{0};
-        
-        // Spatially iterate over BBX
-        for (float x = color_tree.getBBXMin().x(); x < color_tree.getBBXMax().x(); x = x + (float)color_tree.getResolution()/2)
-        {
-            for (float y = color_tree.getBBXMin().y(); y < color_tree.getBBXMax().y(); y = y + (float)color_tree.getResolution()/2)
-            {
-                for (float z = color_tree.getBBXMin().z(); z < color_tree.getBBXMax().z(); z = z + (float)color_tree.getResolution()/2)
-                {
-                    // transform coordinates according to T
-                    octomap::point3d gripper3d{x,y,z};
-                    octomap::point3d world3d{GraspPlanningUtils::transform_point3d(T, gripper3d)};
-
-                    // search for corresponding nodes in octrees
-                    octomap::OcTreeGripperNode* gn = gripper_tree_->search(gripper3d);
-                    octomap::OcTreeGraspQualityNode* tn = target_tree_->search(world3d);
-
-                    // colorise nodes
-                    octomap::ColorOcTreeNode::Color color{0,0,0};
-                    float log_odds;
-                    if (!tn && !gn) // if both nodes null, node is free
-                    {
-                        //color_tree.updateNode(world3d, false); // ? By understanding unknown state as free, we don't really need to explicitely set to free
-                    }
-                    else // occupied
-                    {
-                        if (!tn != !gn) // XOR
-                        {
-                            // node is not known in both octrees
-                            if (tn) 
-                            {
-                                log_odds = tn->getLogOdds();
-                                color.b = 100; // dark blue
-                            }
-                            else 
-                            {
-                                log_odds = gn->getLogOdds();
-                                if (gn->isGraspingSurface()) color.g = 255; // green for grasping (free) nodes
-                                else color.b = 255; // light blue
-                            }
-                        }
-                        else // node known to both gripper and target trees
-                        {
-                            log_odds = tn->getLogOdds();
-                            if (gn->isGraspingSurface()) color.g = 255;
-                            else color.r = 255;
-                        }
-                        octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, log_odds);
-                        n->setColor(color);
-                    }
-                }
-            }
-
-            // print progress
-            std::cout << '\r' << current_x_step << "steps" << std::flush;
-            current_x_step++;
-        }
-        #endif
-
-        #if ITERATION_METHOD==1
-        // *** Method 1 *** Iterate over both octree nodes
+        // * Iterate over both octree nodes
         // iterate over target octree
         for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_->begin_leafs(), end=target_tree_->end_leafs(); it!= end; ++it)
         {
@@ -373,7 +291,6 @@ namespace GraspVisualisations
                 nn->setColor(color);
             }
         }
-        #endif
         color_tree.updateInnerOccupancy();
 
         return translated_ColorOcTree(color_tree, origin_offset);

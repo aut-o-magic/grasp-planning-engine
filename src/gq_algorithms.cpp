@@ -167,8 +167,59 @@ namespace GraspQualityMethods
      */
     inline float gq_raycasting(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
+        if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
+
         float score{0};
 
+        for(auto it = grasping_pairs.begin(); it != grasping_pairs.end(); ++it)
+        {
+            // retrieve pair coordinates
+            octomap::point3d gripper3d_left{it->first.getCoordinate()};
+            octomap::point3d gripper3d_right{it->second.getCoordinate()};
+
+            // transform coordinates according to T
+            octomap::point3d world3d_left{GraspPlanningUtils::transform_point3d(T, gripper3d_left)};
+            octomap::point3d world3d_right{GraspPlanningUtils::transform_point3d(T, gripper3d_right)};
+            
+            octomap::point3d direction{(world3d_right-world3d_left).normalized()}; // First to second
+            octomap::point3d hit_left;
+            octomap::point3d hit_right;
+
+            // build histogram of angles
+            if (target_tree_->castRay(world3d_left, direction, hit_left, true)) // if occupied node was hit
+            {
+                octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
+                if (n && target_tree_->isNodeOccupied(n)) // if occupied
+                {
+                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
+                    for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                    {
+                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                        int angle_deg = (int)(rot_angle_rad/(M_PI)*180); // angle always between (0-90)
+                        if (angle_deg < 0 || angle_deg >90) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        score += ((float)(angle_deg-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.
+                    }
+                }
+            }
+            if (target_tree_->castRay(world3d_right, -direction, hit_right, true)) // if occupied node was hit
+            {
+                octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
+                if (n && target_tree_->isNodeOccupied(n)) // if occupied
+                {
+                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
+                    for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                    {
+                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                        int angle_deg = 180 - (int)(rot_angle_rad/(M_PI)*180); // angle always between (90-180), standardised to (0-90)
+                        if (angle_deg < 0 || angle_deg >90) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        score += ((float)(angle_deg-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.
+                    }
+                }
+            }
+        }
+
+        // normalise score
+        score /= (grasping_pairs.size()*2); // divide by sample size
 
         return score;
     }

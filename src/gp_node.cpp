@@ -61,11 +61,13 @@ int main(int argc, char *argv[])
             if (fs::extension(target_filepath) == ".bt")
             {
                 octomap::OcTree* target_tree = new octomap::OcTree(target_filepath);
+                target_tree->expand();
                 gqm.set_target_tree(target_tree); 
             }
             else if (fs::extension(target_filepath) == ".ot")
             {
                 octomap::OcTreeGraspQuality* target_tree = new octomap::OcTreeGraspQuality(target_filepath);
+                target_tree->expand();
                 gqm.set_target_tree(target_tree);
             }
             else
@@ -95,11 +97,13 @@ int main(int argc, char *argv[])
                 if (fs::extension(gripper_filepath) == ".bt")
                 {
                     octomap::OcTree* gripper_tree = new octomap::OcTree(gripper_filepath);
+                    gripper_tree->expand();
                     gqm.set_gripper_tree(gripper_tree, gripper_normal, min_point3d, max_point3d);
                 }
                 else if (fs::extension(gripper_filepath) == ".ot")
                 {
                     octomap::OcTreeGripper* gripper_tree = new octomap::OcTreeGripper(gripper_filepath);
+                    gripper_tree->expand();
                     gqm.set_gripper_tree(gripper_tree);
                 }
                 else

@@ -47,9 +47,9 @@ int main(int argc, char *argv[])
     unsigned int gp_algorithm_select;
 
     // Graspable gripper BBX definition and grasping normal vector // TODO Find a way to optionally pass this as CLI args
-    octomap::point3d min_point3d{-0.04,0.115,0.085}; // xyz min -0.04,0.115,0.085
-    octomap::point3d max_point3d{0.04,0.145,0.102}; // xyz max 0.04,0.145,0.102
-    octomap::point3d gripper_normal{0,1,0}; // y-axis points towards target surface normal in 2F85 gripper model
+    const octomap::point3d min_point3d{-0.04,0.113,0.083}; // xyz min
+    const octomap::point3d max_point3d{0.042,0.152,0.104}; // xyz max
+    const octomap::point3d gripper_normal{0,1,0}; // y-axis points towards target surface normal in 2F85 gripper model
 
     // *** Parse CLI args
     // * Options for loading objects to memory

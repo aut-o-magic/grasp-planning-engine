@@ -27,14 +27,14 @@ public:
 
     /** 
      * Helper function to generate a representative simple anti-podal gripper model with same BBX grasping region as more complex alternative
+     * @param grasping_normal Normal vector of the gripper towards the target surface
      * @param min_point3d minimum corner coordinate of bounding box in meters
      * @param max_point3d maximum corner coordinate of bounding box in meters
      */
-    void set_simple_gripper(const octomap::point3d& min_point3d, const octomap::point3d& max_point3d)
+    void set_simple_gripper(const octomap::point3d& grasping_normal, const octomap::point3d& min_point3d, const octomap::point3d& max_point3d)
     {
         std::cout << "[set_simple_gripper] started..." << std::endl;
         // * Non-graspable shell region
-        octomap::point3d grasping_normal{0,1,0}; // Normal direction for gripping is {0,1,0}
         this->gripper_tree_->setGraspingNormal(grasping_normal);
         const double res{this->gripper_tree_->getResolution()};
         const octomap::point3d min_shell{min_point3d - octomap::point3d(res,res,0)};

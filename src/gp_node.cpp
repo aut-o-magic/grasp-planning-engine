@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            gqm.set_simple_gripper(min_point3d, max_point3d);
+            gqm.set_simple_gripper(gripper_normal, min_point3d, max_point3d);
         }
     }
     else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_gripper") || vm.count("write_color_gripper")) // if gripper required, raise error

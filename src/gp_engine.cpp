@@ -384,7 +384,7 @@ private:
                         octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, false);
                         nn->setIsGraspingSurface(true);
                     }
-                    else if (n->getLogOdds() <= gripper_tree_->getProbMissLog()) // node is free
+                    else if (!gripper_tree_->isNodeOccupied(n)) // node is free
                     {
                         n->setIsGraspingSurface(true);
                     }

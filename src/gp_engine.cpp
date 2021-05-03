@@ -34,6 +34,10 @@ public:
     void set_simple_gripper(const octomap::point3d& grasping_normal, const octomap::point3d& min_point3d, const octomap::point3d& max_point3d)
     {
         std::cout << "[set_simple_gripper] started..." << std::endl;
+
+        // * Graspable BBX
+        octomap::point3d grasp_center_point{add_graspable_region(min_point3d, max_point3d)};
+        
         // * Non-graspable shell region
         this->gripper_tree_->setGraspingNormal(grasping_normal);
         const double res{this->gripper_tree_->getResolution()};
@@ -54,17 +58,15 @@ public:
                         octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, true);
                         nn->setIsGraspingSurface(false);
                     }
-                    else // If node exists
+                    else // If node exists override nodes within graspable region
+
                     {
-                        if (!gripper_tree_->isNodeOccupied(n)) // if node is free
+                        if (!n->isGraspingSurface()) // if node is not grasping surface set to occupied, else ignore
                             n->setLogOdds(this->gripper_tree_->getProbHitLog());
-                        n->setIsGraspingSurface(false);
                     }
                 }
             }
         }
-        // * Override nodes within graspable region
-        octomap::point3d grasp_center_point{add_graspable_region(min_point3d, max_point3d)};
         this->gripper_tree_->setOrigin(grasp_center_point);
         this->gripper_tree_->expand();
     }

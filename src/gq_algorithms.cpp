@@ -121,18 +121,19 @@ namespace GraspQualityMethods
         const int mean = (histogram_combined * Eigen::Array<int, 91, 1>::LinSpaced(0,90)).sum()/samples;
         const float std_dev = sqrt((histogram_combined * Eigen::Array<int, 91, 1>::LinSpaced(0-mean,90-mean)).square().sum() / samples);
         
+        /* median unused right now
         // calculate median
         int median = 0;
         int accumulator = 0;
         int i = 0;
-        while (accumulator < samples/2)
+        while (accumulator < (int)samples/2)
         {
             int new_bin = histogram_combined[i];
             if (abs((int)samples/2 - accumulator - new_bin) < abs((int)samples/2 - accumulator)) median = i;
             accumulator += new_bin;
             ++i;
         }
-
+        */
         //std::cout << "Samples = " << samples << ", mean = " << mean << ", median = " << median << ", std dev = " << std_dev << std::endl;
 
         // assign score based on heuristic linear regression slopes

@@ -379,16 +379,16 @@ private:
             for (k[1] = minKey[1]; k[1] < maxKey[1]; ++k[1]){
                 for (k[2] = minKey[2]; k[2] < maxKey[2]; ++k[2]){
                     octomap::OcTreeGripperNode* n = gripper_tree_->search(k);
-                    if(!n) // If node has not been populated yet
+                    if(!n) // If node is unknown
                     {
                         octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, false);
                         nn->setIsGraspingSurface(true);
-                    } 
-                    else // If node exists
+                    }
+                    else if (n->getLogOdds() <= gripper_tree_->getProbMissLog()) // node is free
                     {
-                        n->setLogOdds(gripper_tree_->getProbMissLog()); // set as free
                         n->setIsGraspingSurface(true);
                     }
+                    // do not set as grasping surface if node is occupied
                 }
             }
         }

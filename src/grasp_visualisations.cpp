@@ -241,7 +241,7 @@ namespace GraspVisualisations
      * @param target_tree_ Target object octree
      * @param gripper_tree_ Gripper octree
      * @param T homogenous transformation from origin to gripper grasping pose
-     * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Light blue -> Non-interacting Gripper voxels; \n Dark blue -> Non-interacting Target voxels.
+     * @returns ColorOcTree visualisation with: \n Green -> Positive overlapping voxels; \n Red -> Negative overlapping voxels; \n Yellow -> Non-interacting Gripper voxels; \n Light blue -> Non-interacting Target voxels.
      * TODO Make multithreaded search execution in method 0 work
      */
     inline octomap::ColorOcTree visualise_global_grasp(const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_, const Eigen::Affine3f& T = Eigen::Affine3f::Identity())
@@ -259,7 +259,7 @@ namespace GraspVisualisations
             // colorise nodes
             octomap::ColorOcTreeNode::Color color{0,0,0};
             octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, it->getLogOdds());
-            color.b = 50;
+            color.b = 255;
             n->setColor(color);
         }
 
@@ -276,7 +276,7 @@ namespace GraspVisualisations
             if (n && color_tree.isNodeOccupied(n)) // if occupied
             {
                 int color_b_node{n->getColor().b};
-                if (0 < color_b_node && color_b_node < 255) // if node is blue but not _fully_ blue (255b is associated with gripper-only nodes)
+                if (color_b_node == 255) // if node fully blue (255b is associated with target nodes)
                 {
                     if (it->isGraspingSurface()) color.g = 255;
                     else color.r = 255;
@@ -287,7 +287,7 @@ namespace GraspVisualisations
             {
                 octomap::ColorOcTreeNode* nn = color_tree.updateNode(world3d, it->getLogOdds());
                 if (it->isGraspingSurface()) color.g = 255; // grasping (free) nodes
-                else color.b = 255;
+                else {color.r = 255; color.g = 255;}
                 nn->setColor(color);
             }
         }

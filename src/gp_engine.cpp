@@ -69,6 +69,7 @@ public:
         }
         this->gripper_tree_->setOrigin(grasp_center_point);
         this->gripper_tree_->expand();
+        this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
     }
 
     /**
@@ -104,6 +105,7 @@ public:
         gripper_tree_->importOcTree(octree);
         gripper_tree_->setGraspingNormal(gripper_normal);
         gripper_tree_->expand();
+        gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
     }
 
     /**
@@ -121,6 +123,7 @@ public:
         octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
         this->gripper_tree_->setOrigin(grasp_center_point);
         this->gripper_tree_->expand();
+        this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
     }
 
     /**

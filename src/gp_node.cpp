@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
     ("write_gripper", po::value<std::string>()->implicit_value("gripper.ot"), "Write gripper octree to file")
     ("write_color_target", po::value<std::string>()->implicit_value("colortree_target.ot"), "Write to file ColorOcTree version of target octree")
     ("write_color_gripper", po::value<std::string>()->implicit_value("colortree_gripper.ot"), "Write to file ColorOcTree version of gripper octree")
+    ("write_surface_normals_density", "Visualise the surface normals density of the target tree")
     ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-4]")
     ("global_analysis", "Perform a global graspability analysis")
     ("local_analysis", po::value<std::vector<float>>(), "Perform a local analysis at a defined target 3D point. Pass arg with no spaces and with equal sign (i.e. --local_analysis={x,y,z}) [m]")
@@ -82,7 +83,7 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_target") || vm.count("write_color_target")) // if target required, raise error
+    else if (vm.count("global_analysis") || vm.count("local_analysis") || vm.count("write_target") || vm.count("write_color_target") || vm.count("write_surface_normals_density")) // if target required, raise error
     {
         std::cerr << "Missing required '--target' CLI option" << std::endl;
         return 1;
@@ -153,6 +154,10 @@ int main(int argc, char *argv[])
         std::string filepath{vm["write_color_gripper"].as<std::string>()};
         if (fs::extension(filepath) != ".ot") filepath += ".ot";
         ((octomap::ColorOcTree)*gqm.get_gripper_tree()).write(filepath);
+    }
+    if (vm.count("write_surface_normals_density"))
+    {
+        GraspVisualisations::visualise_surface_normals_density(gqm.get_target_tree());
     }
 
     // * Options for analysing graspability

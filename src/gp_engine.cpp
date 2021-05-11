@@ -49,9 +49,9 @@ public:
         gripper_tree_->coordToKeyChecked(max_shell, maxKey);
 
         octomap::OcTreeKey k;
-        for (k[0] = minKey[0]; k[0] < maxKey[0]; ++k[0]){
-            for (k[1] = minKey[1]; k[1] < maxKey[1]; ++k[1]){
-                for (k[2] = minKey[2]; k[2] < maxKey[2]; ++k[2]){
+        for (k[0] = minKey[0]; k[0] <= maxKey[0]; ++k[0]){
+            for (k[1] = minKey[1]; k[1] <= maxKey[1]; ++k[1]){
+                for (k[2] = minKey[2]; k[2] <= maxKey[2]; ++k[2]){
                     octomap::OcTreeGripperNode* n = gripper_tree_->search(k);
                     if(!n) // If node has not been populated yet
                     {
@@ -380,9 +380,9 @@ private:
         this->gripper_tree_->expand();
 
         octomap::OcTreeKey k;
-        for (k[0] = minKey[0]; k[0] < maxKey[0]; ++k[0]){
-            for (k[1] = minKey[1]; k[1] < maxKey[1]; ++k[1]){
-                for (k[2] = minKey[2]; k[2] < maxKey[2]; ++k[2]){
+        for (k[0] = minKey[0]; k[0] <= maxKey[0]; ++k[0]){
+            for (k[1] = minKey[1]; k[1] <= maxKey[1]; ++k[1]){
+                for (k[2] = minKey[2]; k[2] <= maxKey[2]; ++k[2]){
                     octomap::OcTreeGripperNode* n = gripper_tree_->search(k);
                     if(!n) // If node is unknown
                     {

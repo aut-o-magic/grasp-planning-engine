@@ -65,46 +65,57 @@ namespace GraspQualityMethods
             octomap::point3d world3d_right{GraspPlanningUtils::transform_point3d(T, gripper3d_right)};
             
             octomap::point3d direction{(world3d_right-world3d_left).normalized()}; // First to second
+            const double distance{abs(world3d_right.distance(world3d_left))};
             octomap::point3d hit_left;
             octomap::point3d hit_right;
 
             // build histogram of angles
-            if (target_tree_->castRay(world3d_left, direction, hit_left, true)) // if occupied node was hit
+            if (target_tree_->castRay(world3d_left, direction, hit_left, true, distance)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
                     octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
-                    for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                    if (!points.empty())
                     {
-                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
-                        int angle_deg = (int)(rot_angle_rad/(M_PI)*180); // angle always between (0-90)
-                        if (angle_deg < 0 || angle_deg >90) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
-                        ++histogram_angles_left[angle_deg];
+                        int best_normal_option_angle = -1;
+                        for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                        {
+                            float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                            int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
+                            if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
+                            if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
+                        }
+                        ++histogram_angles_left[best_normal_option_angle];
                     }
                 }
             }
-            if (target_tree_->castRay(world3d_right, -direction, hit_right, true)) // if occupied node was hit
+            if (target_tree_->castRay(world3d_right, -direction, hit_right, true, distance)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
                     octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
-                    for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                    if (!points.empty())
                     {
-                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
-                        int angle_deg = 180 - (int)(rot_angle_rad/(M_PI)*180); // angle always between (90-180), standardised to (0-90)
-                        if (angle_deg < 0 || angle_deg >90) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
-                        ++histogram_angles_right[angle_deg];
+                        int best_normal_option_angle = -1;
+                        for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                        {
+                            float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                            int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
+                            if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
+                            if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
+                        }
+                        ++histogram_angles_right[best_normal_option_angle];
                     }
                 }
             }
         }
         #ifdef write_csv
         std::ofstream myfile;
-        myfile.open("method2histogram2.csv");
+        myfile.open("method2histogram.csv");
         myfile << "angle,left,right\n";
-        for (unsigned int i=0; i <= 90; ++i)
+        for (unsigned int i=0; i <= histogram_angles_left.size()-1; ++i)
         {
             myfile << i << "," << histogram_angles_left[i] << "," << histogram_angles_right[i] << "\n";
             std::cout << "histo[" << i << "]: left=" << histogram_angles_left[i] << ", right=" << histogram_angles_right[i] << std::endl;
@@ -118,6 +129,7 @@ namespace GraspQualityMethods
         
         // calculate mean and std dev
         const unsigned int samples = histogram_combined.sum();
+        if (samples == 0) return 0.0F;
         const int mean = (histogram_combined * Eigen::Array<int, 91, 1>::LinSpaced(0,90)).sum()/samples;
         const float std_dev = sqrt((histogram_combined * Eigen::Array<int, 91, 1>::LinSpaced(0-mean,90-mean)).square().sum() / samples);
         
@@ -139,6 +151,7 @@ namespace GraspQualityMethods
         // assign score based on heuristic linear regression slopes
         const float weight_mean{0.5F}; // 50% of total score comes from the mean, other 50% from std dev
         float score = ((float)mean)/90.0F * weight_mean + 100.0F/std::max(std_dev,100.0F) * (1.0F-weight_mean); // TODO Finetune std_dev formula for score
+        //std::cout << "*****score = " << score << ", meanscore = " << ((float)mean)/90.0F << "stdscore = " << 100.0F/std::max(std_dev,100.0F) << std::endl;
         // ? Maybe use median and mean, instead of std dev?
         return score;
     }
@@ -183,11 +196,12 @@ namespace GraspQualityMethods
             octomap::point3d world3d_right{GraspPlanningUtils::transform_point3d(T, gripper3d_right)};
             
             octomap::point3d direction{(world3d_right-world3d_left).normalized()}; // First to second
+            const double distance{abs(world3d_right.distance(world3d_left))};
             octomap::point3d hit_left;
             octomap::point3d hit_right;
 
             // build histogram of angles
-            if (target_tree_->castRay(world3d_left, direction, hit_left, true)) // if occupied node was hit
+            if (target_tree_->castRay(world3d_left, direction, hit_left, true, distance)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
@@ -196,13 +210,13 @@ namespace GraspQualityMethods
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
                         float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
-                        int angle_deg = (int)(rot_angle_rad/(M_PI)*180); // angle always between (0-90)
-                        if (angle_deg < 0 || angle_deg >90) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
+                        if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
                         score += ((float)(angle_deg-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.
                     }
                 }
             }
-            if (target_tree_->castRay(world3d_right, -direction, hit_right, true)) // if occupied node was hit
+            if (target_tree_->castRay(world3d_right, -direction, hit_right, true, distance)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
@@ -211,8 +225,8 @@ namespace GraspQualityMethods
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
                         float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
-                        int angle_deg = 180 - (int)(rot_angle_rad/(M_PI)*180); // angle always between (90-180), standardised to (0-90)
-                        if (angle_deg < 0 || angle_deg >90) std::cout << "OUTOFBOUNDS ANGLEDEG" << std::endl; // ! Test properly and remove check
+                        int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
+                        if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
                         score += ((float)(angle_deg-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.
                     }
                 }

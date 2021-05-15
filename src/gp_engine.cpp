@@ -18,6 +18,7 @@
 #define GP_ONLYSURFACENORMALS 2 // Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
 #define GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS 3 // 1 and 2 methods combined
 #define GP_RAYCASTINGANTIPODALPLANES 4 // Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
+#define GP_COPLANARITYCONTACTPOINTS 5
 
 class graspQualityMap
 {
@@ -191,6 +192,10 @@ public:
             std::cout << "RAYCASTINGANTIPODALPLANES SELECTED" << std::endl;
             gq_function = GraspQualityMethods::gq_raycasting;
             break;
+        case GP_COPLANARITYCONTACTPOINTS:
+            std::cout << "COPLANARITYCONTACTPOINTS SELECTED" << std::endl;
+            gq_function = GraspQualityMethods::pairs_coplanarity;
+            break;
         default:
             std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;
             return Tbest;
@@ -232,6 +237,10 @@ public:
             case GP_RAYCASTINGANTIPODALPLANES:
                 std::cout << "RAYCASTINGANTIPODALPLANES SELECTED" << std::endl;
                 gq_function = GraspQualityMethods::gq_raycasting;
+                break;
+            case GP_COPLANARITYCONTACTPOINTS:
+                std::cout << "COPLANARITYCONTACTPOINTS SELECTED" << std::endl;
+                gq_function = GraspQualityMethods::pairs_coplanarity;
                 break;
             default:
                 std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;

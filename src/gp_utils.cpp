@@ -213,4 +213,130 @@ namespace GraspPlanningUtils
         if (nodes_left.size() != vector_pair.size()) std::cerr << "[graspingPairs] ERROR: resulting vector pair and node stacks have different lengths" << std::endl;
         return vector_pair;
     }
+
+    /**
+     * Generate a copy of the tree nodes with the provided node resolution
+     * @param tree Input tree to be rescaled
+     * @param resolution New tree resolution
+     * @returns Copy of the tree nodes with the new resolution
+     * ! Not working, see ! comment below
+     */
+    template<typename TREE>
+    inline TREE* rescaleTree(const TREE* tree, const double &resolution)
+    {
+        std::cout << "[rescaleTree] started..." << std::endl;
+        TREE* out_tree = new TREE(*tree); // copying tree to copy any class attributes (metadata). Not an efficient call, but the only one currently supported for all octree types
+        out_tree->clear(); // delete tree structure // ! This tries deleting the imported tree structure, need to copy contents in constructor, instead of the entire tree like that.
+        out_tree->setResolution(resolution);
+        octomap::OcTreeKey minKey, maxKey, k;
+        double xmin, ymin, zmin, xmax, ymax, zmax;
+        tree->getMetricMin(xmin,ymin,zmin);
+        tree->getMetricMax(xmax,ymax,zmax);
+        out_tree->coordToKeyChecked(xmin, ymin, zmin, minKey);
+        out_tree->coordToKeyChecked(xmax, ymax, zmax, maxKey);
+
+        for (k[0] = minKey[0]; k[0] <= maxKey[0]; ++k[0]){
+            for (k[1] = minKey[1]; k[1] <= maxKey[1]; ++k[1]){
+                for (k[2] = minKey[2]; k[2] <= maxKey[2]; ++k[2]){
+                    auto* node_ptr = tree->search(out_tree->keyToCoord(k)); // TODO substitute auto for an actual type
+                    if(node_ptr) // If node exists
+                    {
+                        out_tree->updateNode(k, node_ptr->getLogOdds())->copyData(*node_ptr);
+                    }
+                }
+            }
+        }
+        out_tree->updateInnerOccupancy();
+        out_tree->expand();
+        return out_tree;
+    }
+
+    /**
+     * Generate a copy of the tree nodes within the defined BBX with the provided node resolution
+     * @param tree Input tree to be rescaled
+     * @param resolution New tree resolution
+     * @param min Minimum corner coordinate of bounding box in meters
+     * @param max Maximum corner coordinate of bounding box in meters
+     * @returns Copy of the tree nodes within the BBX with the new resolution
+     * ! Not working yet, due to problem with BBX-less impl of this fcn
+     */
+    template<typename TREE>
+    inline TREE* rescaleTree(const TREE* tree, const double &resolution, const octomap::point3d& min, const octomap::point3d& max)
+    {
+        // * Copy subset of the tree structure within (min, max)
+        TREE* tree_bbx = new TREE(*tree); // copying tree to copy any class attributes (metadata). Not an efficient call, but the only one currently supported for all octree types
+        tree_bbx->clear(); // delete tree structure
+
+        for(typename TREE::leaf_bbx_iterator it = tree->begin_leafs_bbx(min, max), end = tree->end_leafs_bbx(); it != end; ++it)
+        {
+            octomap::OcTreeKey key;
+            if (tree_bbx->coordToKeyChecked(it.getCoordinate(), key))
+            {
+                tree_bbx->updateNode(key, it->getLogOdds())->copyData(*it);
+            }
+            else std::cerr << "[rescaleTree] Attempted to copy invalid node" << std::endl;
+            if (!(tree_bbx->search(key) == *it)) std::cerr << "NODES NOT IDENTICAL, FAIL" << std::endl; // ! remove DEBUG
+        }
+        return rescaleTree(tree_bbx, resolution); // feed subset of tree to generic overload for actual rescaling
+    }
+
+    /**
+     * Generate a fast copy of the tree structure with the provided node resolution. This fast method will not preserve the tree class attributes (metadata), only the tree structure!
+     * @param tree Input tree to be rescaled
+     * @param resolution New tree resolution
+     * @returns Copy of the tree nodes with the new resolution
+     */
+    template<typename TREE>
+    inline TREE* rescaleTreeStructure(const TREE* tree, const double &resolution)
+    {
+        TREE* out_tree = new TREE(resolution); // copying tree to copy any class attributes (metadata). Not an efficient call, but the only one currently supported for all octree types
+
+        octomap::OcTreeKey minKey, maxKey, k;
+        double xmin, ymin, zmin, xmax, ymax, zmax;
+        tree->getMetricMin(xmin,ymin,zmin);
+        tree->getMetricMax(xmax,ymax,zmax);
+        out_tree->coordToKeyChecked(xmin, ymin, zmin, minKey);
+        out_tree->coordToKeyChecked(xmax, ymax, zmax, maxKey);
+
+        for (k[0] = minKey[0]; k[0] <= maxKey[0]; ++k[0]){
+            for (k[1] = minKey[1]; k[1] <= maxKey[1]; ++k[1]){
+                for (k[2] = minKey[2]; k[2] <= maxKey[2]; ++k[2]){
+                    auto* node_ptr = tree->search(out_tree->keyToCoord(k)); // TODO substitute auto for an actual type
+                    if(node_ptr) // If node exists
+                    {
+                        out_tree->updateNode(k, node_ptr->getLogOdds())->copyData(*node_ptr);
+                    }
+                }
+            }
+        }
+        out_tree->updateInnerOccupancy();
+        out_tree->expand();
+        return out_tree;
+    }
+
+    /**
+     * Generate a fast copy of the tree structure within the defined BBX with the provided node resolution. This fast method will not preserve the tree class attributes (metadata), only the tree structure!
+     * @param tree Input tree to be rescaled
+     * @param resolution New tree resolution
+     * @param min Minimum corner coordinate of bounding box in meters
+     * @param max Maximum corner coordinate of bounding box in meters
+     * @returns Copy of the tree nodes within the BBX with the new resolution
+     */
+    template<typename TREE>
+    inline TREE* rescaleTreeStructure(const TREE* tree, const double &resolution, const octomap::point3d& min, const octomap::point3d& max)
+    {
+        // * Copy subset of the tree structure within (min, max)
+        TREE* tree_bbx = new TREE(tree->getResolution());
+
+        for(typename TREE::leaf_bbx_iterator it = tree->begin_leafs_bbx(min, max), end = tree->end_leafs_bbx(); it != end; ++it)
+        {
+            octomap::OcTreeKey key;
+            if (tree_bbx->coordToKeyChecked(it.getCoordinate(), key))
+            {
+                tree_bbx->updateNode(key, it->getLogOdds())->copyData(*it);
+            }
+            else std::cerr << "[rescaleTreeStructure] Attempted to copy invalid node" << std::endl;
+        }
+        return rescaleTreeStructure(tree_bbx, resolution); // feed subset of tree to generic overload for actual rescaling
+    }
 }

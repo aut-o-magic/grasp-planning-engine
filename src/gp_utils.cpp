@@ -21,6 +21,21 @@ namespace GraspPlanningUtils
     }
 
     /**
+     * Calculate the angle between two vectors safetly, handling floating-point imprecision safely
+     * @param lhs Vector 1
+     * @param rhs Vector 2
+     * @returns angle between vector in radians
+     */
+    inline float safe_angleTo(const octomap::point3d& lhs, const octomap::point3d& rhs)
+    {
+        double dotProduct = lhs.dot(rhs);
+        double len1 = lhs.norm();
+        double len2 = rhs.norm();
+        double op = std::max(std::min(dotProduct / (len1*len2),1.0),-1.0); // clamp between (-1.0,1.0)
+        return (float)acos(op);
+    }
+
+    /**
      * Simple std::out formatter for node occupancy queries
      * @param query 3D point being queried
      * @param node corresponding octree node

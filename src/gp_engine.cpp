@@ -341,7 +341,7 @@ private:
                 // rotation between gripper origin pointing vec and normal is R0 // ! gripper does not necessary stay horizontal with this convention, but results are reproduceable
                 it_norm->normalize(); // Assure normalised normal vector
 
-                float rot_angle{(float)gripper_tree->getGraspingNormal().angleTo(*it_norm)};
+                float rot_angle{GraspPlanningUtils::safe_angleTo(gripper_tree->getGraspingNormal(),*it_norm)};
                 octomap::point3d rot_axis{gripper_tree->getGraspingNormal().cross(*it_norm)};
                 Eigen::Vector3f eigen_rot_axis{rot_axis.x(), rot_axis.y(), rot_axis.z()};
                 Eigen::AngleAxisf rotation{rot_angle, eigen_rot_axis};

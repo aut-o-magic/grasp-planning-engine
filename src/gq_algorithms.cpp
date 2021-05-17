@@ -81,7 +81,7 @@ namespace GraspQualityMethods
                         int best_normal_option_angle = -1;
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
-                            float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
                             if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
@@ -101,7 +101,7 @@ namespace GraspQualityMethods
                         int best_normal_option_angle = -1;
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
-                            float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
                             if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
@@ -209,7 +209,7 @@ namespace GraspQualityMethods
                     octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
-                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                        float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
                         int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                         if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
                         score += ((float)(angle_deg-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.
@@ -224,7 +224,7 @@ namespace GraspQualityMethods
                     octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
-                        float rot_angle_rad{(float)gripper_tree_->getGraspingNormal().angleTo(*it_3d)};
+                        float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
                         int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                         if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
                         score += ((float)(angle_deg-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.

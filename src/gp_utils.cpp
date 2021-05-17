@@ -310,22 +310,33 @@ namespace GraspPlanningUtils
         double xmin, ymin, zmin, xmax, ymax, zmax;
         tree->getMetricMin(xmin,ymin,zmin);
         tree->getMetricMax(xmax,ymax,zmax);
-        out_tree->coordToKeyChecked(xmin, ymin, zmin, minKey);
-        out_tree->coordToKeyChecked(xmax, ymax, zmax, maxKey);
-
-        for (k[0] = minKey[0]; k[0] <= maxKey[0]; ++k[0]){
-            for (k[1] = minKey[1]; k[1] <= maxKey[1]; ++k[1]){
-                for (k[2] = minKey[2]; k[2] <= maxKey[2]; ++k[2]){
-                    auto* node_ptr = tree->search(out_tree->keyToCoord(k)); // TODO substitute auto for an actual type
-                    if(node_ptr) // If node exists
-                    {
-                        out_tree->updateNode(k, node_ptr->getLogOdds())->copyData(*node_ptr);
+        if (out_tree->coordToKeyChecked(xmin, ymin, zmin, minKey) && out_tree->coordToKeyChecked(xmax, ymax, zmax, maxKey))
+        {
+            for (k[0] = minKey[0]; k[0] <= maxKey[0]; ++k[0]){
+                for (k[1] = minKey[1]; k[1] <= maxKey[1]; ++k[1]){
+                    for (k[2] = minKey[2]; k[2] <= maxKey[2]; ++k[2]){
+                        auto* node_ptr = tree->search(out_tree->keyToCoord(k)); // TODO substitute auto for an actual type
+                        if(node_ptr) // If node exists
+                        {
+                            out_tree->updateNode(k, node_ptr->getLogOdds())->copyData(*node_ptr);
+                        }
                     }
                 }
             }
+            if (out_tree->getRoot()) // NULL if tree is empty
+            {
+                out_tree->updateInnerOccupancy();
+                out_tree->expand();
+            }
+            else 
+            {
+                std::cerr << "[rescaleTreeStructure] empty outgoing tree" << std::endl;
+            }
         }
-        out_tree->updateInnerOccupancy();
-        out_tree->expand();
+        else
+        {
+            std::cerr << "[rescaleTreeStructure] incoming tree has invalid dimensions" << std::endl;
+        }
         return out_tree;
     }
 
@@ -351,6 +362,18 @@ namespace GraspPlanningUtils
                 tree_bbx->updateNode(key, it->getLogOdds())->copyData(*it);
             }
             else std::cerr << "[rescaleTreeStructure] Attempted to copy invalid node" << std::endl;
+        }
+        if (tree_bbx->getRoot()) // NULL if tree is empty
+        {
+            tree_bbx->updateInnerOccupancy();
+            tree_bbx->expand();
+        }
+        else 
+        {
+            std::cerr << "[rescaleTreeStructure] empty outgoing bbx tree. BBX too narrow?" << std::endl;
+            std::cerr << "Min BBX: \n" << min << std::endl;
+            std::cerr << "Max BBX: \n" << max << std::endl;
+            return tree_bbx;
         }
         return rescaleTreeStructure(tree_bbx, resolution); // feed subset of tree to generic overload for actual rescaling
     }

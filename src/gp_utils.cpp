@@ -108,7 +108,7 @@ namespace GraspPlanningUtils
             // check if vector already exists in filtered collection, if not push it there
             for (unsigned int j=0; j < filtered_normals.size(); ++j)
             {
-                if (current_vector.angleTo(filtered_normals[j]) < angle_threshold_same_vector) already_exists = true;
+                if (safe_angleTo(current_vector,filtered_normals[j]) < angle_threshold_same_vector) already_exists = true;
             }
             // if vector normal doesnt already exist in filtered collection, push it there
             if (!already_exists) filtered_normals.push_back(current_vector);

@@ -258,5 +258,100 @@ namespace GraspQualityMethods
 
         return score;
     }
+
+    /**
+     * Compute coplanarity of (separate) target surface contact points hit by rays cast from both antipodal gripper planes
+     * @param T homogenous transformation from origin to gripper grasping pose
+     * @param target_tree_ Target object octree
+     * @param gripper_tree_ Gripper octree
+     * @returns Normalised grasp quality score between [0,1]
+     * ! It's painfully slow for global analysis
+     */
+    inline float pairs_coplanarity(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
+    {
+        if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
+
+        Eigen::Matrix3Xf hits_left;
+        Eigen::Matrix3Xf hits_right;
+        hits_left.resize(Eigen::NoChange_t{}, grasping_pairs.size());
+        hits_right.resize(Eigen::NoChange_t{}, grasping_pairs.size());
+        unsigned int size_left{0};
+        unsigned int size_right{0};
+
+        for(auto it = grasping_pairs.begin(); it != grasping_pairs.end(); ++it)
+        {
+            // retrieve pair coordinates
+            octomap::point3d gripper3d_left{it->first.getCoordinate()};
+            octomap::point3d gripper3d_right{it->second.getCoordinate()};
+
+            // transform coordinates according to T
+            octomap::point3d world3d_left{GraspPlanningUtils::transform_point3d(T, gripper3d_left)};
+            octomap::point3d world3d_right{GraspPlanningUtils::transform_point3d(T, gripper3d_right)};
+
+            // scale ray tunnel to gripper resolution
+            float tres = (float)target_tree_->getResolution();
+            octomap::point3d BBXmargin{tres,tres,tres}; // add a little margin to avoid failing zero-width ray tunnels
+            octomap::point3d min = GraspPlanningUtils::min_composite_vector(world3d_left, world3d_right) - BBXmargin;
+            octomap::point3d max = GraspPlanningUtils::max_composite_vector(world3d_left, world3d_right) + BBXmargin;
+            octomap::OcTreeGraspQuality* rescaledRayTunnel = GraspPlanningUtils::rescaleTreeStructure(target_tree_, gripper_tree_->getResolution(), min, max);
+            octomap::point3d direction{(world3d_right-world3d_left).normalized()}; // First to second
+            const double distance{abs(world3d_right.distance(world3d_left))};
+            octomap::point3d hit_left;
+            octomap::point3d hit_right;
+
+            // store nodes hit into arrays
+            if (rescaledRayTunnel->castRay(world3d_left, direction, hit_left, true, distance)) // if occupied node was hit
+            {
+                hits_left.col(size_left++) = Eigen::Vector3f(hit_left.x(), hit_left.y(), hit_left.z());
+            }
+            if (rescaledRayTunnel->castRay(world3d_right, -direction, hit_right, true, distance)) // if occupied node was hit
+            {
+                hits_right.col(size_right++) = Eigen::Vector3f(hit_right.x(), hit_right.y(), hit_right.z());
+            }
+        }
+
+        // slice in place
+        hits_left.conservativeResize(Eigen::NoChange_t{}, size_left);
+        hits_right.conservativeResize(Eigen::NoChange_t{}, size_right);
+        
+        // * fit planes through point sets (compute score)
+        Eigen::Matrix3Xf c_hits_left = hits_left.colwise() - hits_left.rowwise().mean(); // centered hitpoints
+        Eigen::Matrix3Xf c_hits_right = hits_right.colwise() - hits_right.rowwise().mean();
+        // Adjoint solver (covariance analysis)
+        // http://downloads.tuxfamily.org/eigen/eigen_CGLibs_Giugno_Pisa_2013.pdf slide 98
+        Eigen::Matrix3f cov_left = c_hits_left * c_hits_left.transpose();
+        Eigen::Matrix3f cov_right = c_hits_right * c_hits_right.transpose();
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eig_left, eig_right;
+        eig_left.computeDirect(cov_left); // faster than .compute() but less precision
+        eig_right.computeDirect(cov_right);
+
+        Eigen::Vector3f normal_left = eig_left.eigenvectors().col(0);
+        Eigen::Vector3f normal_right = eig_right.eigenvectors().col(0);
+
+        /* SVD attempt
+        Eigen::JacobiSVD<Eigen::MatrixX3f> svd_left(c_hits_left, Eigen::ComputeThinU | Eigen::ComputeThinV);
+        Eigen::JacobiSVD<Eigen::MatrixX3f> svd_right(c_hits_right, Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+        Eigen::Vector3f normal_left = svd_left.matrixU().col(2);
+        Eigen::Vector3f normal_right = svd_right.matrixU().col(2);
+        */
+        
+        // * compute score
+        octomap::point3d normal_left_3d{normal_left.x(), normal_left.y(), normal_left.z()};
+        octomap::point3d normal_right_3d{normal_right.x(), normal_right.y(), normal_right.z()};
+        float rot_angle_rad_left{(float)gripper_tree_->getGraspingNormal().angleTo(normal_left_3d)}; // ! incorrect, gripper not rotated
+        int angle_deg_left = (int)(abs(cos((rot_angle_rad_left))*90)); // angle always between (0-90)
+        if (angle_deg_left < 0 || angle_deg_left >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg_left << std::endl;
+        float rot_angle_rad_right{(float)gripper_tree_->getGraspingNormal().angleTo(normal_right_3d)}; // ! incorrect, gripper not rotated
+        int angle_deg_right = (int)(abs(cos((rot_angle_rad_right))*90)); // angle always between (0-90)
+        if (angle_deg_right < 0 || angle_deg_right >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg_right << std::endl;
+
+        float score_normal_vector = (float)(angle_deg_left + angle_deg_right)/180.0F; // 1 if both vectors are at 90deg from grasping normal
+        float score_surface_variance = 1.0F;
+
+        // * normalise score
+        float weight = 1.0F;//0.5F;
+        return (float)score_normal_vector*weight + (float)score_surface_variance*(1.0F-weight);
+    }
 }
 

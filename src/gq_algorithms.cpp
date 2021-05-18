@@ -82,18 +82,18 @@ namespace GraspQualityMethods
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
-                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
+                    //octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
+                    octomap::point3d_collection points;
+                    target_tree_->getNormals(hit_left, points, false);
                     if (!points.empty())
                     {
-                        int best_normal_option_angle = -1;
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
                             float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
-                            if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
+                            ++histogram_angles_left[angle_deg];
                         }
-                        ++histogram_angles_left[best_normal_option_angle];
                     }
                 }
             }
@@ -102,18 +102,18 @@ namespace GraspQualityMethods
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
-                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
+                    //octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
+                    octomap::point3d_collection points;
+                    target_tree_->getNormals(hit_left, points, false);
                     if (!points.empty())
                     {
-                        int best_normal_option_angle = -1;
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
                             float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
-                            if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
+                            ++histogram_angles_left[angle_deg];
                         }
-                        ++histogram_angles_right[best_normal_option_angle];
                     }
                 }
             }

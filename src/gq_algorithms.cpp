@@ -55,8 +55,8 @@ namespace GraspQualityMethods
         octomap::point3d graspingnormal = gripper_tree_->getGraspingNormal();
         Eigen::Vector3f graspingnormal_eigen{graspingnormal.x(), graspingnormal.y(), graspingnormal.z()};
         Eigen::Vector3f graspingnormal_rotated_eigen = T.rotation() * graspingnormal_eigen;
-        octomap::point3d grasping_normal_rotated{graspingnormal_rotated_eigen.x(), graspingnormal_rotated_eigen.y(), graspingnormal_rotated_eigen.z()};
-        grasping_normal_rotated.normalize();
+        octomap::point3d graspingnormal_rotated{graspingnormal_rotated_eigen.x(), graspingnormal_rotated_eigen.y(), graspingnormal_rotated_eigen.z()};
+        graspingnormal_rotated.normalize();
 
         std::vector<int> histogram_angles_left (91,0); // create 91 (0,90) fields populated with 0s
         std::vector<int> histogram_angles_right (91,0); // create 91 (0,90) fields populated with 0s
@@ -88,7 +88,7 @@ namespace GraspQualityMethods
                         int best_normal_option_angle = -1;
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
-                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
+                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
                             if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
@@ -108,7 +108,7 @@ namespace GraspQualityMethods
                         int best_normal_option_angle = -1;
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
-                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
+                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
                             if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;

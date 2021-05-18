@@ -253,7 +253,7 @@ public:
         // expand target_tree for complete analysis // ? Most likely unnecessary
         target_tree_->expand();
         // progress tracking variables
-        size_t total_nodes{target_tree_->calcNumNodes()};
+        size_t total_nodes{target_tree_->getNumLeafNodes()};
         std::cout << "Total nodes: " << total_nodes << std::endl;
         size_t current_node{0};
 

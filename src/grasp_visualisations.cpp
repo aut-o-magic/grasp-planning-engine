@@ -85,11 +85,7 @@ namespace GraspVisualisations
     {
         std::cout << "[visualise_surface_normals_density] started..." << std::endl;
         octomap::ColorOcTree color_tree_normals_density{target_tree_->getResolution()};
-        unsigned int normal0{0};
-        unsigned int normal1{0};
-        unsigned int normal2{0};
-        unsigned int normal3{0};
-        unsigned int normal3plus{0};
+        std::vector<unsigned int> normals_vec(5); // (0,1,2,3,3+)
 
         for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_->begin_leafs(), end=target_tree_->end_leafs(); it!= end; ++it)
         {
@@ -100,20 +96,19 @@ namespace GraspVisualisations
             // Populate color_tree_normals_density object
             octomap::ColorOcTreeNode* snn = color_tree_normals_density.updateNode(it.getCoordinate(), it->getLogOdds());
             octomap::ColorOcTreeNode::Color color{0,0,0};
-            // white = 0, red = 1, green = 2, blue = 3, black => 4
-            if (normals.size() == 0) {normal0++;}
-            else if (normals.size() == 1) {color.r = 255; normal1++;}
-            else if (normals.size() == 2) {color.g = 255; normal2++;}
-            else if (normals.size() == 3) {color.b = 255; normal3++;}
-            else {color = octomap::ColorOcTreeNode::Color{255, 255, 255}; normal3plus++;}
-            uint8_t r = std::max((unsigned long)0, 255-(normals.size()*51));
-            uint8_t g = std::min((unsigned long)255, 0+(normals.size()*51));
-            snn->setColor(r,g,0);
+            // black = 0, 1 <= red ... green
+            if (!normals.empty())
+            {
+                color.r = std::max((unsigned long)0, 255-(normals.size()*51));
+                color.g = std::min((unsigned long)255, 0+(normals.size()*51));
+            }
+            normals_vec[std::min(normals.size(),normals_vec.size()-1)]++;            
+            snn->setColor(color);
         }
 
         color_tree_normals_density.updateInnerOccupancy();
 
-        std::cout << "[Surface normals density study]:" << std::endl << "Size collection: [0]=" << normal0 << " [1]=" << normal1 << " [2]=" << normal2 << " [3]=" << normal3 << " [3+]=" << normal3plus << std::endl;
+        std::cout << "[Surface normals density study]:" << std::endl << "Size collection: [0]=" << normals_vec[0] << " [1]=" << normals_vec[1] << " [2]=" << normals_vec[2] << " [3]=" << normals_vec[3] << " [3+]=" << normals_vec[4] << std::endl;
         color_tree_normals_density.write("color_tree_normals_density.ot");
     }
 

@@ -160,7 +160,7 @@ namespace GraspQualityMethods
         float score = ((float)mean)/90.0F * weight_mean + 100.0F/std::max(std_dev,100.0F) * (1.0F-weight_mean); // TODO Finetune std_dev formula for score
         //std::cout << "*****score = " << score << ", meanscore = " << ((float)mean)/90.0F << "stdscore = " << 100.0F/std::max(std_dev,100.0F) << std::endl;
         // ? Maybe use median and mean, instead of std dev?
-        return score;
+        return score*samples/(grasping_pairs.size()*2); // normalise score accounting for % of nodes hit from total
     }
 
     /**

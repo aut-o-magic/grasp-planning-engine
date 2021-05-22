@@ -326,6 +326,8 @@ private:
         Eigen::Vector3f coordinates_node{it_node.getCoordinate().x(), it_node.getCoordinate().y(), it_node.getCoordinate().z()};
         Eigen::Affine3f T0{Eigen::Affine3f::Identity()}; // T0 is transformation from gripper origin in world (target) frame to grasping point and pointing vector as dictated by each output of marching cubes algorithm 
         T0.translation() = coordinates_node;
+        Tbest = T0; // assign such that in case of early termination Tbest is initialised
+        if (normals.empty()) return; // if there is no normal to the surface, terminate early
 
         // Keep record of best nodal score
         float best_nodal_score{-1}; 
@@ -378,6 +380,7 @@ private:
      * @param min minimum corner coordinate of bounding box in meters
      * @param max maximum corner coordinate of bounding box in meters
      * @returns center of newly added graspable region
+     * ? Move to GraspPlanningUtils or gripper octomap implementation?
      */
     octomap::point3d add_graspable_region(const octomap::point3d& min, const octomap::point3d& max)
     {

@@ -256,7 +256,7 @@ namespace GraspPlanningUtils
                     auto* node_ptr = tree->search(out_tree->keyToCoord(k)); // TODO substitute auto for an actual type
                     if(node_ptr) // If node exists
                     {
-                        out_tree->updateNode(k, node_ptr->getLogOdds())->copyData(*node_ptr);
+                        out_tree->updateNode(k, node_ptr->getLogOdds(), true)->copyData(*node_ptr);
                     }
                 }
             }
@@ -287,11 +287,12 @@ namespace GraspPlanningUtils
             octomap::OcTreeKey key;
             if (tree_bbx->coordToKeyChecked(it.getCoordinate(), key))
             {
-                tree_bbx->updateNode(key, it->getLogOdds())->copyData(*it);
+                tree_bbx->updateNode(key, it->getLogOdds(), true)->copyData(*it);
             }
             else std::cerr << "[rescaleTree] Attempted to copy invalid node" << std::endl;
             if (!(tree_bbx->search(key) == *it)) std::cerr << "NODES NOT IDENTICAL, FAIL" << std::endl; // ! remove DEBUG
         }
+        tree_bbx->updateInnerOccupancy();
         return rescaleTree(tree_bbx, resolution); // feed subset of tree to generic overload for actual rescaling
     }
 
@@ -318,7 +319,7 @@ namespace GraspPlanningUtils
                         auto* node_ptr = tree->search(out_tree->keyToCoord(k)); // TODO substitute auto for an actual type
                         if(node_ptr) // If node exists
                         {
-                            out_tree->updateNode(k, node_ptr->getLogOdds())->copyData(*node_ptr);
+                            out_tree->updateNode(k, node_ptr->getLogOdds(), true)->copyData(*node_ptr);
                         }
                     }
                 }
@@ -359,7 +360,7 @@ namespace GraspPlanningUtils
             octomap::OcTreeKey key;
             if (tree_bbx->coordToKeyChecked(it.getCoordinate(), key))
             {
-                tree_bbx->updateNode(key, it->getLogOdds())->copyData(*it);
+                tree_bbx->updateNode(key, it->getLogOdds(), true)->copyData(*it);
             }
             else std::cerr << "[rescaleTreeStructure] Attempted to copy invalid node" << std::endl;
         }

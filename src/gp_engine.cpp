@@ -56,7 +56,7 @@ public:
                     octomap::OcTreeGripperNode* n = gripper_tree_->search(k);
                     if(!n) // If node has not been populated yet
                     {
-                        octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, true);
+                        octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, true, true);
                         nn->setIsGraspingSurface(false);
                     }
                     else // If node exists override nodes within graspable region
@@ -68,6 +68,7 @@ public:
                 }
             }
         }
+        this->gripper_tree_->updateInnerOccupancy();
         this->gripper_tree_->setOrigin(grasp_center_point);
         this->gripper_tree_->expand();
         this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
@@ -321,8 +322,8 @@ private:
     static void node_gq_analysis(const octomap::OcTreeGraspQuality::leaf_iterator& it_node, const octomap::OcTreeGraspQuality* target_tree, const octomap::OcTreeGripper* gripper_tree, const gq_method& gq_virtual, octomap::OcTreeGraspQualityNode::GraspQuality& gq, Eigen::Affine3f& Tbest)
     {
         // * Retrieve surface normals and gripper translation (t0)
-        octomap::point3d_collection normals = GraspPlanningUtils::get_surface_normals(target_tree, it_node.getCoordinate());
-        if (normals.empty()) return; // if there is no normal to the surface, terminate early
+        octomap::point3d_collection normals;
+        if (!target_tree->getNormal(it_node.getCoordinate(), normals)) return;
         Eigen::Vector3f coordinates_node{it_node.getCoordinate().x(), it_node.getCoordinate().y(), it_node.getCoordinate().z()};
         Eigen::Affine3f T0{Eigen::Affine3f::Identity()}; // T0 is transformation from gripper origin in world (target) frame to grasping point and pointing vector as dictated by each output of marching cubes algorithm 
         T0.translation() = coordinates_node;
@@ -330,7 +331,7 @@ private:
         if (normals.empty()) return; // if there is no normal to the surface, terminate early
 
         // Keep record of best nodal score
-        float best_nodal_score{-1}; 
+        float best_nodal_score{-1};
 
         // * Iterate over each gripper angle discretisation (R01)
         for (unsigned int i=0; i<gq.angle_quality.row(0).size(); ++i)
@@ -398,7 +399,7 @@ private:
                     octomap::OcTreeGripperNode* n = gripper_tree_->search(k);
                     if(!n) // If node is unknown
                     {
-                        octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, false);
+                        octomap::OcTreeGripperNode* nn = this->gripper_tree_->updateNode(k, false, true);
                         nn->setIsGraspingSurface(true);
                     }
                     else if (!gripper_tree_->isNodeOccupied(n)) // node is free
@@ -409,6 +410,7 @@ private:
                 }
             }
         }
+        this->gripper_tree_->updateInnerOccupancy();
         this->gripper_tree_->updateNumGraspableVoxels();
         octomap::point3d center_bbx{(max-min)*0.5 + min};
         return center_bbx;

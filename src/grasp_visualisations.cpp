@@ -31,7 +31,7 @@ inline octomap::ColorOcTree translated_ColorOcTree(octomap::ColorOcTree& tree, c
     for (octomap::ColorOcTree::leaf_iterator it = tree.begin_leafs(), end=tree.end_leafs(); it!= end; ++it)
     {
         octomap::point3d coord{it.getCoordinate() - matched_translation};
-        octomap::ColorOcTreeNode* n = new_tree.updateNode(coord, it->getLogOdds());
+        octomap::ColorOcTreeNode* n = new_tree.updateNode(coord, it->getLogOdds(), true);
         n->setColor(it->getColor());
 
     }
@@ -94,7 +94,7 @@ namespace GraspVisualisations
             normals = get_surface_normals(target_tree_, it.getCoordinate());
 
             // Populate color_tree_normals_density object
-            octomap::ColorOcTreeNode* snn = color_tree_normals_density.updateNode(it.getCoordinate(), it->getLogOdds());
+            octomap::ColorOcTreeNode* snn = color_tree_normals_density.updateNode(it.getCoordinate(), it->getLogOdds(), true);
             octomap::ColorOcTreeNode::Color color{0,0,0};
             // black = 0, 1 <= red ... green
             if (!normals.empty())
@@ -188,7 +188,7 @@ namespace GraspVisualisations
                             
                         }
                         else continue;
-                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, log_odds);
+                        octomap::ColorOcTreeNode* n = color_tree.updateNode(gripper3d, log_odds, true);
                         n->setColor(color);
                     }
                 }
@@ -221,7 +221,7 @@ namespace GraspVisualisations
                     if (it->isGraspingSurface()) color.g = 255;
                     else color.b = 255; 
                 }
-                octomap::ColorOcTreeNode* nn = color_tree.updateNode(gripper3d, log_odds);
+                octomap::ColorOcTreeNode* nn = color_tree.updateNode(gripper3d, log_odds, true);
                 nn->setColor(color);
             }
         }
@@ -253,10 +253,11 @@ namespace GraspVisualisations
             
             // colorise nodes
             octomap::ColorOcTreeNode::Color color{0,0,0};
-            octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, it->getLogOdds());
+            octomap::ColorOcTreeNode* n = color_tree.updateNode(world3d, it->getLogOdds(), true);
             color.b = 255;
             n->setColor(color);
         }
+        color_tree.updateInnerOccupancy();
 
         // iterate over gripper octree
         for (octomap::OcTreeGripper::leaf_iterator it = gripper_tree_->begin_leafs(), end=gripper_tree_->end_leafs(); it!= end; ++it)
@@ -280,7 +281,7 @@ namespace GraspVisualisations
             }
             else // only populated by gripper
             {
-                octomap::ColorOcTreeNode* nn = color_tree.updateNode(world3d, it->getLogOdds());
+                octomap::ColorOcTreeNode* nn = color_tree.updateNode(world3d, it->getLogOdds(), true);
                 if (it->isGraspingSurface()) color.g = 255; // grasping (free) nodes
                 else {color.r = 255; color.g = 255;}
                 nn->setColor(color);

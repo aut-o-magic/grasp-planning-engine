@@ -83,13 +83,13 @@ namespace GraspPlanningUtils
     }
 
     /**
-     * Compute the surface normals of the octree at the target point
+     * Compute the surface normals of the octree at the target point. Uses the original Marching Cubes octomap implementation of getNormals()
      * @param tree Input OcTree
      * @param point3d Point at which to compute the surface normals
      * @returns Collection of surface normals normalised vectors
      */
     template<typename TREE>
-    inline octomap::point3d_collection get_surface_normals(const TREE* tree, const octomap::point3d& point3d)
+    inline octomap::point3d_collection get_filtered_surface_normals(const TREE* tree, const octomap::point3d& point3d)
     {
         const double angle_threshold_same_vector = 0.01; // rad (0.01rad = 0.573deg) // TODO set to a meaningful value
         octomap::point3d_collection normals;

@@ -39,41 +39,6 @@ inline octomap::ColorOcTree translated_ColorOcTree(octomap::ColorOcTree& tree, c
     return new_tree;
 }
 
-/**
- * Compute the surface normals of the octree at the target point
- * @param tree Input OcTree
- * @param point3d Point at which to compute the surface normals
- * @returns Collection of surface normals normalised vectors
- */
-template<typename NODE>
-static octomap::point3d_collection get_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d)
-{
-    const double angle_threshold_same_vector = 0.01; // rad (0.01rad = 0.573deg)
-    octomap::point3d_collection normals;
-    octomap::point3d_collection filtered_normals;
-    if (!tree->getNormals(point3d, normals, false)) // run octomap surface reconstruction function considering unknown measurements as FREE
-    {
-        std::cerr << "[gp_engine::get_surface_normals()] call failed" << std::endl;
-        return normals;
-    }
-    // loop through normal vector collection and remove repeated entries
-    bool already_exists{false}; // flag to hold whether vector already exists in filtered normals
-    for (unsigned int i=0; i < normals.size(); ++i)
-    {
-        octomath::Vector3 current_vector{normals[i]};
-        
-        // check if vector already exists in filtered collection, if not push it there
-        for (unsigned int j=0; j < filtered_normals.size(); ++j)
-        {
-            if (current_vector.angleTo(filtered_normals[j]) < angle_threshold_same_vector) already_exists = true;
-        }
-        // if vector normal doesnt already exist in filtered collection, push it there
-        if (!already_exists) filtered_normals.push_back(current_vector);
-        already_exists = false; // reset flag
-    }
-    return filtered_normals;
-}
-
 namespace GraspVisualisations
 {
     /**

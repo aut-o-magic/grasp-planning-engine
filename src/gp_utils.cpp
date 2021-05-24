@@ -31,8 +31,8 @@ namespace GraspPlanningUtils
         double dotProduct = lhs.dot(rhs);
         double len1 = lhs.norm();
         double len2 = rhs.norm();
-        double op = std::max(std::min(dotProduct / (len1*len2),1.0),-1.0); // clamp between (-1.0,1.0)
-        return (float)acos(op);
+        float op = std::max<float>(std::min<float>((float)(dotProduct / (len1*len2)),1.0F),-1.0F); // clamp between (-1.0,1.0)
+        return acos(op);
     }
 
     /**
@@ -88,15 +88,15 @@ namespace GraspPlanningUtils
      * @param point3d Point at which to compute the surface normals
      * @returns Collection of surface normals normalised vectors
      */
-    template<typename TREE>
-    inline octomap::point3d_collection get_filtered_surface_normals(const TREE* tree, const octomap::point3d& point3d)
+    template<typename NODE>
+    inline octomap::point3d_collection get_filtered_surface_normals(const octomap::OccupancyOcTreeBase<NODE>* tree, const octomap::point3d& point3d)
     {
         const double angle_threshold_same_vector = 0.01; // rad (0.01rad = 0.573deg) // TODO set to a meaningful value
         octomap::point3d_collection normals;
         octomap::point3d_collection filtered_normals;
         if (!tree->getNormals(point3d, normals, false)) // run octomap surface reconstruction function considering unknown measurements as FREE
         {
-            std::cerr << "[gp_engine::get_surface_normals()] call failed" << std::endl;
+            std::cerr << "[GraspPlanningUtils::get_filtered_surface_normals()] call to getNormals of tree failed" << std::endl;
             return normals;
         }
         // loop through normal vector collection and remove repeated entries

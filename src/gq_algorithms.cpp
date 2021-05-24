@@ -54,7 +54,7 @@ namespace GraspQualityMethods
         // rotate grasping normal gripper
         octomap::point3d graspingnormal = gripper_tree_->getGraspingNormal();
         Eigen::Vector3f graspingnormal_eigen{graspingnormal.x(), graspingnormal.y(), graspingnormal.z()};
-        Eigen::Vector3f graspingnormal_rotated_eigen = T.rotation() * graspingnormal_eigen;
+        Eigen::Vector3f graspingnormal_rotated_eigen = T.linear() * graspingnormal_eigen;
         octomap::point3d graspingnormal_rotated{graspingnormal_rotated_eigen.x(), graspingnormal_rotated_eigen.y(), graspingnormal_rotated_eigen.z()};
         graspingnormal_rotated.normalize();
 
@@ -86,13 +86,15 @@ namespace GraspQualityMethods
                     target_tree_->getNormal(hit_left, points); // ! Toggle to use getNormal()
                     if (!points.empty())
                     {
+                        int best_option_angle_deg{-1};
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
                             float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
-                            ++histogram_angles_left[angle_deg];
+                            if (angle_deg > best_option_angle_deg) best_option_angle_deg = angle_deg;
                         }
+                        ++histogram_angles_left[best_option_angle_deg];
                     }
                 }
             }
@@ -105,13 +107,15 @@ namespace GraspQualityMethods
                     target_tree_->getNormal(hit_right, points); // ! Toggle to use getNormal()
                     if (!points.empty())
                     {
-                        for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
+                        int best_option_angle_deg{-1};
+                        for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); it_3d++)
                         {
                             float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
-                            ++histogram_angles_left[angle_deg];
+                            if (angle_deg > best_option_angle_deg) best_option_angle_deg = angle_deg;
                         }
+                        ++histogram_angles_right[best_option_angle_deg];
                     }
                 }
             }
@@ -131,10 +135,10 @@ namespace GraspQualityMethods
         // merge histograms into eigen array
         Eigen::Array<int, 91, 1> histogram_combined;
         std::transform(histogram_angles_left.begin(), histogram_angles_left.end(), histogram_angles_right.begin(), histogram_combined.data(), std::plus<int>());
-        
+        unsigned int samples{(unsigned int)histogram_combined.sum()};
+        if (samples == 0U) return 0.0F; // if there were no hits the score is zero, no need for further processing
+
         // calculate mean and std dev
-        const unsigned int samples = histogram_combined.sum();
-        if (samples == 0) return 0.0F;
         const int mean = (histogram_combined * Eigen::Array<int, 91, 1>::LinSpaced(0,90)).sum()/samples;
         const float std_dev = sqrt((histogram_combined * Eigen::Array<int, 91, 1>::LinSpaced(0-mean,90-mean)).square().sum() / samples);
         
@@ -151,14 +155,18 @@ namespace GraspQualityMethods
             ++i;
         }
         */
-        //std::cout << "Samples = " << samples << ", mean = " << mean << ", median = " << median << ", std dev = " << std_dev << std::endl;
 
         // assign score based on heuristic linear regression slopes
         const float weight_mean{0.5F}; // 50% of total score comes from the mean, other 50% from std dev
-        float score = ((float)mean)/90.0F * weight_mean + 100.0F/std::max(std_dev,100.0F) * (1.0F-weight_mean); // TODO Finetune std_dev formula for score
-        //std::cout << "*****score = " << score << ", meanscore = " << ((float)mean)/90.0F << "stdscore = " << 100.0F/std::max(std_dev,100.0F) << std::endl;
+        float score = ((float)mean)/90.0F * weight_mean + 10.0F/std::max(std_dev,10.0F) * (1.0F-weight_mean);
         // ? Maybe use median and mean, instead of std dev?
-        return score*samples/(grasping_pairs.size()*2); // normalise score accounting for % of nodes hit from total
+        float fraction_samples = (float)samples/((float)grasping_pairs.size()*2.0F);
+        if (score*fraction_samples > 1.0F)
+        {
+            std::cerr << "SCORE OVER 1 (" << score*fraction_samples << ")" << std::endl;
+            std::cout << "Mean score = " << ((float)mean)/90.0F << ", stddev score = " << 10.0F/std::max(std_dev,10.0F) << ", samples = " << samples << ", grasping_pairs.size() = " << grasping_pairs.size() << ", fraction_samples = " << fraction_samples << ", score = " << score << ", normalised score = " << score*fraction_samples << std::endl;
+        }
+        return score*fraction_samples; // normalise score accounting for % of nodes hit from total
     }
 
     /**

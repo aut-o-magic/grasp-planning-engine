@@ -54,9 +54,8 @@ namespace GraspVisualisations
 
         for (octomap::OcTreeGraspQuality::leaf_iterator it = target_tree_->begin_leafs(), end=target_tree_->end_leafs(); it!= end; ++it)
         {
-            octomap::point3d_collection normals;
-            //print_query_info(it.getCoordinate(), &(*it));
-            normals = get_surface_normals(target_tree_, it.getCoordinate());
+            octomap::point3d_collection normals;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree_, it.getCoordinate());
+            if(!target_tree_->getNormal(it.getKey(), normals)) std::cerr << "[visualise_surface_normals_density] getNormal returned false" << std::endl; // ! Toggle to use getNormal()
 
             // Populate color_tree_normals_density object
             octomap::ColorOcTreeNode* snn = color_tree_normals_density.updateNode(it.getCoordinate(), it->getLogOdds(), true);

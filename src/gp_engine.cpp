@@ -205,6 +205,7 @@ public:
         node_gq_analysis(it_node, this->target_tree_, this->gripper_tree_, gq_function, gq, Tbest);
 
         std::cout << "*** Best grasp candidate at " << it_node.getCoordinate() << " has a score of " << gq.angle_quality.row(1).maxCoeff() << " ***" << std::endl;
+        std::cout << gq.angle_quality.matrix() << std::endl;
 
         return Tbest;
     }
@@ -322,14 +323,18 @@ private:
     static void node_gq_analysis(const octomap::OcTreeGraspQuality::leaf_iterator& it_node, const octomap::OcTreeGraspQuality* target_tree, const octomap::OcTreeGripper* gripper_tree, const gq_method& gq_virtual, octomap::OcTreeGraspQualityNode::GraspQuality& gq, Eigen::Affine3f& Tbest)
     {
         // * Retrieve surface normals and gripper translation (t0)
-        octomap::point3d_collection normals;
-        if (!target_tree->getNormal(it_node.getCoordinate(), normals)) return;
+        octomap::point3d_collection normals;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree, it_node.getCoordinate());
         Eigen::Vector3f coordinates_node{it_node.getCoordinate().x(), it_node.getCoordinate().y(), it_node.getCoordinate().z()};
         Eigen::Affine3f T0{Eigen::Affine3f::Identity()}; // T0 is transformation from gripper origin in world (target) frame to grasping point and pointing vector as dictated by each output of marching cubes algorithm 
         T0.translation() = coordinates_node;
         Tbest = T0; // assign such that in case of early termination Tbest is initialised
-        if (normals.empty()) return; // if there is no normal to the surface, terminate early
-
+        
+        if (!target_tree->getNormal(it_node.getCoordinate(), normals) || normals.empty()) // if there is no normal to the surface, terminate early
+        {
+            //std::cerr << "[node_gq_analysis] terminated early: getNormal successful?->" << target_tree->getNormal(it_node.getCoordinate(), normals) << ", normals empty?->" << normals.empty() << std::endl;
+            return;
+        }
+        
         // Keep record of best nodal score
         float best_nodal_score{-1};
 
@@ -342,23 +347,23 @@ private:
             for (octomap::point3d_collection::iterator it_norm = normals.begin(), end = normals.end(); it_norm != end; ++it_norm)
             {
                 // rotation between gripper origin pointing vec and normal is R0 // ! gripper does not necessary stay horizontal with this convention, but results are reproduceable
-                it_norm->normalize(); // Assure normalised normal vector
 
                 float rot_angle{GraspPlanningUtils::safe_angleTo(gripper_tree->getGraspingNormal(),*it_norm)};
                 octomap::point3d rot_axis{gripper_tree->getGraspingNormal().cross(*it_norm)};
+                rot_axis.normalize();
                 Eigen::Vector3f eigen_rot_axis{rot_axis.x(), rot_axis.y(), rot_axis.z()};
                 Eigen::AngleAxisf rotation{rot_angle, eigen_rot_axis};
                 T0.linear() = rotation.toRotationMatrix(); // rotation component is called "linear part" in Eigen library https://eigen.tuxfamily.org/dox/classEigen_1_1Transform.html
 
                 // * Apply gripper angle rotation
-                Eigen::Affine3f Ti{T0};
+                Eigen::Affine3f T01{Eigen::Affine3f::Identity()};
                 float angle{gq.angle_quality.row(0)(i)};
-                Eigen::Vector3f norm_eigen{it_norm->x(), it_norm->y(), it_norm->z()};
-                Eigen::AngleAxisf rot{angle, norm_eigen}; // rotate around pointing vector axis
-                Ti.rotate(rot);
+                Eigen::Vector3f norm_eigen{gripper_tree->getGraspingNormal().x(), gripper_tree->getGraspingNormal().y(), gripper_tree->getGraspingNormal().z()};
+                Eigen::AngleAxisf R01{angle, norm_eigen}; // rotate around pointing vector axis
+                Eigen::Affine3f T1 = T0 * R01;
 
                 // * Calculate grasp quality for each normal candidate and record best one
-                float score = gq_virtual(Ti, target_tree, gripper_tree);
+                float score = gq_virtual(T1, target_tree, gripper_tree);
                 if (score > best_local_score)
                 {
                     best_local_score = score;
@@ -366,10 +371,10 @@ private:
                     // record best nodal grasp candidate
                     if (best_local_score > best_nodal_score)
                     {
-                        Tbest = Ti;
+                        Tbest = T1;
                         best_nodal_score = best_local_score;
                     }
-                }
+                }               
             }
             // Write to gq object
             gq.angle_quality.row(1)(i) = best_local_score;

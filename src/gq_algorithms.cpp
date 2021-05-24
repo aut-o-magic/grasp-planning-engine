@@ -82,9 +82,8 @@ namespace GraspQualityMethods
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
-                    //octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
-                    octomap::point3d_collection points;
-                    target_tree_->getNormals(hit_left, points, false);
+                    octomap::point3d_collection points;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree_, hit_left);
+                    target_tree_->getNormal(hit_left, points); // ! Toggle to use getNormal()
                     if (!points.empty())
                     {
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
@@ -102,9 +101,8 @@ namespace GraspQualityMethods
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
                 if (n && target_tree_->isNodeOccupied(n)) // if occupied
                 {
-                    //octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
-                    octomap::point3d_collection points;
-                    target_tree_->getNormals(hit_left, points, false);
+                    octomap::point3d_collection points;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree_, hit_right);
+                    target_tree_->getNormal(hit_right, points); // ! Toggle to use getNormal()
                     if (!points.empty())
                     {
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
@@ -217,9 +215,9 @@ namespace GraspQualityMethods
             if (target_tree_->castRay(world3d_left, direction, hit_left, true, distance)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
-                if (n && target_tree_->isNodeOccupied(n)) // if occupied
+                octomap::point3d_collection points;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree_, hit_left);
+                if (n && target_tree_->isNodeOccupied(n) && target_tree_->getNormal(hit_left, points)) // if occupied and has normal (is in surface) // ! Toggle to use getNormal()
                 {
-                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_left);
                     int best_normal_option_angle = -1;
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
@@ -234,9 +232,9 @@ namespace GraspQualityMethods
             if (target_tree_->castRay(world3d_right, -direction, hit_right, true, distance)) // if occupied node was hit
             {
                 octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
-                if (n && target_tree_->isNodeOccupied(n)) // if occupied
+                octomap::point3d_collection points;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree_, hit_right);
+                if (n && target_tree_->isNodeOccupied(n) && target_tree_->getNormal(hit_right, points)) // if occupied and has normal (is in surface) // ! Toggle to use getNormal()
                 {
-                    octomap::point3d_collection points = GraspPlanningUtils::get_surface_normals(target_tree_, hit_right);
                     int best_normal_option_angle = -1;
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {

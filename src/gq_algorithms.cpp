@@ -19,9 +19,11 @@ namespace GraspQualityMethods
      */
     inline float gq_voxelsuperimposition(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
+        // ! Weights
+        const float reward{1}; // reward for positive node interaction
+        const float penalty{1}; // penalty for negative node interaction
+
         float score{0};
-        float reward{1}; // reward for positive node interaction
-        float penalty{1}; // penalty for negative node interaction
 
         for (octomap::OcTreeGripper::leaf_iterator it = gripper_tree_->begin_leafs(), end=gripper_tree_->end_leafs(); it!= end; ++it)
         {
@@ -49,6 +51,10 @@ namespace GraspQualityMethods
      */
     inline float gq_surfacenormals(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
+        // ! Weights
+        const float weight_mean{0.5F}; // % (1-based) of total score comes from the mean, other fraction from std dev
+        const float std_saturation{10.0F};
+
         if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
 
         // rotate grasping normal gripper
@@ -157,14 +163,13 @@ namespace GraspQualityMethods
         */
 
         // assign score based on heuristic linear regression slopes
-        const float weight_mean{0.5F}; // 50% of total score comes from the mean, other 50% from std dev
-        float score = ((float)mean)/90.0F * weight_mean + 10.0F/std::max(std_dev,10.0F) * (1.0F-weight_mean);
+        float score = ((float)mean)/90.0F * weight_mean + std_saturation/std::max(std_dev,std_saturation) * (1.0F-weight_mean);
         // ? Maybe use median and mean, instead of std dev?
         float fraction_samples = (float)samples/((float)grasping_pairs.size()*2.0F);
         if (score*fraction_samples > 1.0F)
         {
             std::cerr << "SCORE OVER 1 (" << score*fraction_samples << ")" << std::endl;
-            std::cout << "Mean score = " << ((float)mean)/90.0F << ", stddev score = " << 10.0F/std::max(std_dev,10.0F) << ", samples = " << samples << ", grasping_pairs.size() = " << grasping_pairs.size() << ", fraction_samples = " << fraction_samples << ", score = " << score << ", normalised score = " << score*fraction_samples << std::endl;
+            std::cout << "Mean score = " << ((float)mean)/90.0F << ", stddev score = " << std_saturation/std::max(std_dev,std_saturation) << ", samples = " << samples << ", grasping_pairs.size() = " << grasping_pairs.size() << ", fraction_samples = " << fraction_samples << ", score = " << score << ", normalised score = " << score*fraction_samples << std::endl;
         }
         return score*fraction_samples; // normalise score accounting for % of nodes hit from total
     }
@@ -179,7 +184,9 @@ namespace GraspQualityMethods
      */
     inline float gq_voxelsuperimposition_surfacenormals(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)//, float voxel_normal_ratio = 0.5)
     {
-        float voxel_normal_ratio{0.5};
+        // ! Weights
+        const float voxel_normal_ratio{0.5};
+        
         float score{gq_voxelsuperimposition(T, target_tree_, gripper_tree_) * voxel_normal_ratio + gq_surfacenormals(T, target_tree_, gripper_tree_) * (1-voxel_normal_ratio)};
         return score;
     }
@@ -193,6 +200,11 @@ namespace GraspQualityMethods
      */
     inline float gq_raycasting(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
+        // ! Weights
+        const int zero_crossing{45};
+
+        float score{0};
+
         if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
 
         // rotate grasping normal gripper
@@ -201,8 +213,6 @@ namespace GraspQualityMethods
         Eigen::Vector3f graspingnormal_rotated_eigen = T.rotation() * graspingnormal_eigen;
         octomap::point3d grasping_normal_rotated{graspingnormal_rotated_eigen.x(), graspingnormal_rotated_eigen.y(), graspingnormal_rotated_eigen.z()};
         grasping_normal_rotated.normalize();
-
-        float score{0};
 
         for(auto it = grasping_pairs.begin(); it != grasping_pairs.end(); ++it)
         {
@@ -251,7 +261,7 @@ namespace GraspQualityMethods
                         if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
                         if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
                     }
-                    score += ((float)(best_normal_option_angle-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.
+                    score += std::max(((float)(best_normal_option_angle-zero_crossing))/(90.0F-(float)zero_crossing),-1.0F); // an angle equal to zero_crossing would give 0 reward/penalty, a 90deg would give (1) reward, and a decreasing angle linearly increases penalty up until a -1.0F penalty.
                 }
             }
         }

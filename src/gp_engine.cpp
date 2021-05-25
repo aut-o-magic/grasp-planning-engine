@@ -14,11 +14,15 @@
 //#include <deque> // std::deque
 
 // Grasp planning algorithms definitions
-#define GP_ONLYVOXELSUPERIMPOSITION 1 // Simply count the number of voxels within the graspable region that collide with voxels from the target
-#define GP_ONLYSURFACENORMALS 2 // Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
-#define GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS 3 // 1 and 2 methods combined
-#define GP_RAYCASTINGANTIPODALPLANES 4 // Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
-#define GP_COPLANARITYCONTACTPOINTS 5
+enum graspPlanningAlgorithms
+{
+    GP_ONLYVOXELSUPERIMPOSITION=1, // Simply count the number of voxels within the graspable region that collide with voxels from the target
+    GP_ONLYSURFACENORMALS=2, // Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
+    GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS=3, // 1 and 2 methods combined
+    GP_RAYCASTINGANTIPODALPLANES=4, // Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
+    GP_COPLANARITYCONTACTPOINTS=5, // method with upscaling, very slow
+    GP_VOXELSUPERIMPOSITIONANDRAYCASTING=6 // 1 and 4 methods combined
+};
 
 class graspQualityMap
 {
@@ -167,7 +171,7 @@ public:
      * @param algorithm_select Implementation index of a specific grasp planning algorithm, listed as macros at top of source file
      * @returns Gripper transformation in target reference frame
      */ 
-    Eigen::Affine3f analyse_local_grasp_quality(const octomap::OcTreeGraspQuality::iterator &it_node, unsigned int algorithm_select)
+    Eigen::Affine3f analyse_local_grasp_quality(const octomap::OcTreeGraspQuality::iterator &it_node, graspPlanningAlgorithms algorithm_select)
     {
         std::cout << "[analyse_local_grasp_quality] started..." << std::endl;
         octomap::OcTreeGraspQualityNode::GraspQuality gq{it_node->getGraspQuality()};
@@ -197,6 +201,10 @@ public:
             std::cout << "COPLANARITYCONTACTPOINTS SELECTED" << std::endl;
             gq_function = GraspQualityMethods::pairs_coplanarity;
             break;
+        case GP_VOXELSUPERIMPOSITIONANDRAYCASTING:
+            std::cout << "VOXELSUPERIMPOSITIONANDRAYCASTING SELECTED" << std::endl;
+            gq_function = GraspQualityMethods::gq_voxelsuperimposition_raycasting;
+            break;
         default:
             std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;
             return Tbest;
@@ -214,7 +222,7 @@ public:
      * Perform geometric fitting to update the grasp quality metric of the target surface
      * @param algorithm_select Implementation index of a specific grasp planning algorithm, listed as macros at top of source file
      */
-    void analyse_global_grasp_quality(unsigned int algorithm_select)
+    void analyse_global_grasp_quality(graspPlanningAlgorithms algorithm_select)
     {
         std::cout << "[update_global_grasp_quality] started..." << std::endl;
         auto start = std::chrono::high_resolution_clock::now();
@@ -243,6 +251,10 @@ public:
             case GP_COPLANARITYCONTACTPOINTS:
                 std::cout << "COPLANARITYCONTACTPOINTS SELECTED" << std::endl;
                 gq_function = GraspQualityMethods::pairs_coplanarity;
+                break;
+            case GP_VOXELSUPERIMPOSITIONANDRAYCASTING:
+                std::cout << "VOXELSUPERIMPOSITIONANDRAYCASTING SELECTED" << std::endl;
+                gq_function = GraspQualityMethods::gq_voxelsuperimposition_raycasting;
                 break;
             default:
                 std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;

@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     ("write_color_target", po::value<std::string>()->implicit_value("colortree_target.ot"), "Write to file ColorOcTree version of target octree")
     ("write_color_gripper", po::value<std::string>()->implicit_value("colortree_gripper.ot"), "Write to file ColorOcTree version of gripper octree")
     ("write_surface_normals_density", "Visualise the surface normals density of the target tree")
-    ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-5]")
+    ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-6]")
     ("global_analysis", "Perform a global graspability analysis")
     ("local_analysis", po::value<std::vector<float>>(), "Perform a local analysis at a defined target 3D point. Pass arg with no spaces and with equal sign (i.e. --local_analysis={x,y,z}) [m]")
     ;
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     // * Initialise objects
     // Grasp Quality Map object handle and declare gp algorithm select
     graspQualityMap gqm{0.01};
-    unsigned int gp_algorithm_select;
+    graspPlanningAlgorithms gp_algorithm_select;
 
     // Graspable gripper BBX definition and grasping normal vector // TODO Find a way to optionally pass this as CLI args
     const octomap::point3d min_point3d{-0.04176238,0.113355,0.0823315}; // xyz min
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
     // * Options for analysing graspability
     if ((vm.count("global_analysis") + vm.count("local_analysis")) >= 1) // gp_algorithm must be provided if a grasp analysis option is used
     {
-        if (vm.count("gp_algorithm")) gp_algorithm_select = vm["gp_algorithm"].as<unsigned int>();
+        if (vm.count("gp_algorithm")) gp_algorithm_select = graspPlanningAlgorithms(vm["gp_algorithm"].as<unsigned int>());
         else
         {
             std::cerr << "Must provide option '--gp_algorithm'" << std::endl;

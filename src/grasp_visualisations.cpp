@@ -238,21 +238,41 @@ namespace GraspVisualisations
                 int color_b_node{n->getColor().b};
                 if (color_b_node == 255) // if node fully blue (255b is associated with target nodes)
                 {
-                    if (it->isGraspingSurface()) color.g = 255;
-                    else color.r = 255;
+                    if (it->isGraspingSurface())
+                    {
+                        color.g = 255;
+                        n->setLogOdds(n->getLogOdds()+(1.0F/1e-4F)); // slightly alter log odds to make nodes of different colors not pruneable
+                    }
+                    else 
+                    {
+                        color.r = 255;
+                        n->setLogOdds(n->getLogOdds()+(2.0F/1e-4F));
+                    }
                     n->setColor(color);
                 }
             }
             else // only populated by gripper
             {
                 octomap::ColorOcTreeNode* nn = color_tree.updateNode(world3d, it->getLogOdds(), true);
-                if (it->isGraspingSurface()) color.g = 255; // grasping (free) nodes
-                else {color.r = 255; color.g = 255;}
+                if (it->isGraspingSurface()) // grasping (free) nodes
+                {
+                    color.g = 255;
+                    nn->setLogOdds(nn->getLogOdds()+(3.0F/1e-4F));
+                }
+                else
+                {
+                    color.r = 255; 
+                    color.g = 255;
+                    nn->setLogOdds(nn->getLogOdds()+(4.0F/1e-4F));
+                }
                 nn->setColor(color);
             }
         }
         color_tree.updateInnerOccupancy();
 
-        return translated_ColorOcTree(color_tree, origin_offset);
+        // center on gripper and prune resulting tree
+        octomap::ColorOcTree translated_color_tree{translated_ColorOcTree(color_tree, origin_offset)};
+        translated_color_tree.prune();
+        return translated_color_tree;
     }
 }

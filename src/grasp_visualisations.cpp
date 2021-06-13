@@ -92,7 +92,7 @@ namespace GraspVisualisations
         // def-> Always use BBX cartesian iteration regardless of show_target_voxels parameter
         
         std::cout << "[visualise_local_grasp] started..." << std::endl;
-        octomap::ColorOcTree color_tree{std::min(gripper_tree_->getResolution(), target_tree_->getResolution())};
+        octomap::ColorOcTree color_tree{gripper_tree_->getResolution()};
 
         #ifndef ALWAYS_CARTESIAN_BBX_METHOD
         if (show_target_voxels)

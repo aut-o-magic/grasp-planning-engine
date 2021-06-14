@@ -20,8 +20,9 @@ enum graspPlanningAlgorithms
     GP_ONLYSURFACENORMALS=2, // Simply calculate the average surface normal of the region of the target colliding with the graspable voxels, and compare it against the ideal surface normal
     GP_VOXELSUPERIMPOSITIONANDSURFACENORMALS=3, // 1 and 2 methods combined
     GP_RAYCASTINGANTIPODALPLANES=4, // Cast rays in both directions between antipodal planes and check each colliding target node surface normal to assess for grasping fitness
-    GP_COPLANARITYCONTACTPOINTS=5, // method with upscaling, very slow
-    GP_VOXELSUPERIMPOSITIONANDRAYCASTING=6 // 1 and 4 methods combined
+    GP_COPLANARITYCONTACTPOINTS=5, // Checks coplanarity of contact points between anti-podal grasping plates by checking variation of distance to target
+    GP_VOXELSUPERIMPOSITIONANDRAYCASTING=6, // 1 and 4 methods combined
+    GP_VOXELSUPERIMPOSITIONANDCOPLANARITY=7 // 1 and 5 methods combined
 };
 
 class graspQualityMap
@@ -205,6 +206,10 @@ public:
             std::cout << "VOXELSUPERIMPOSITIONANDRAYCASTING SELECTED" << std::endl;
             gq_function = GraspQualityMethods::gq_voxelsuperimposition_raycasting;
             break;
+        case GP_VOXELSUPERIMPOSITIONANDCOPLANARITY:
+            std::cout << "GP_VOXELSUPERIMPOSITIONANDCOPLANARITY SELECTED" << std::endl;
+            gq_function = GraspQualityMethods::gq_voxelsuperimposition_coplanarity;
+            break;
         default:
             std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;
             return Tbest;
@@ -255,6 +260,10 @@ public:
             case GP_VOXELSUPERIMPOSITIONANDRAYCASTING:
                 std::cout << "VOXELSUPERIMPOSITIONANDRAYCASTING SELECTED" << std::endl;
                 gq_function = GraspQualityMethods::gq_voxelsuperimposition_raycasting;
+                break;
+            case GP_VOXELSUPERIMPOSITIONANDCOPLANARITY:
+                std::cout << "GP_VOXELSUPERIMPOSITIONANDCOPLANARITY SELECTED" << std::endl;
+                gq_function = GraspQualityMethods::gq_voxelsuperimposition_coplanarity;
                 break;
             default:
                 std::cerr << "ERROR. Invalid grasp planning algorithm selected" << std::endl;

@@ -386,5 +386,22 @@ namespace GraspQualityMethods
         float score{gq_voxelsuperimposition(T, target_tree_, gripper_tree_) * voxel_normal_ratio + gq_raycasting(T, target_tree_, gripper_tree_) * (1-voxel_normal_ratio)};
         return score;
     }
+
+    /**
+     * Check for voxel superimposition (method 1) score and coplanarity (method 5)
+     * @param T homogenous transformation from origin to gripper grasping pose
+     * @param target_tree_ Target object octree
+     * @param gripper_tree_ Gripper octree
+     * @param voxel_normal_ratio Percentage (in 1 scale) weight given to voxel superimposition method against surface normal method
+     * TODO find a way to pass weight ratio
+     */
+    inline float gq_voxelsuperimposition_coplanarity(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)//, float voxel_normal_ratio = 0.5)
+    {
+        // ! Weights
+        const float voxel_normal_ratio{0.5};
+        
+        float score{gq_voxelsuperimposition(T, target_tree_, gripper_tree_) * voxel_normal_ratio + pairs_coplanarity(T, target_tree_, gripper_tree_) * (1-voxel_normal_ratio)};
+        return score;
+    }
 }
 

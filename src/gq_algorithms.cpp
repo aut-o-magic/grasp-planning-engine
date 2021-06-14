@@ -288,18 +288,27 @@ namespace GraspQualityMethods
      * @param target_tree_ Target object octree
      * @param gripper_tree_ Gripper octree
      * @returns Normalised grasp quality score between [0,1]
-     * ! It's painfully slow for global analysis
      */
     inline float pairs_coplanarity(const Eigen::Affine3f& T, const octomap::OcTreeGraspQuality* target_tree_, const octomap::OcTreeGripper* gripper_tree_)
     {
+        // ! Weights
+        const float weight_mean{0.5F}; // % (1-based) of total score comes from the abs(mean-median), other fraction from std dev
+        const float std_saturation{5.0F}; // in number of bins
+        const unsigned int bins_steps{100}; // number of discretisations between grasping plates (resolution)
+
+
         if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
 
-        Eigen::Matrix3Xf hits_left;
-        Eigen::Matrix3Xf hits_right;
-        hits_left.resize(Eigen::NoChange_t{}, grasping_pairs.size());
-        hits_right.resize(Eigen::NoChange_t{}, grasping_pairs.size());
-        unsigned int size_left{0};
-        unsigned int size_right{0};
+        // rotate grasping normal gripper
+        octomap::point3d graspingnormal = gripper_tree_->getGraspingNormal();
+        Eigen::Vector3f graspingnormal_eigen{graspingnormal.x(), graspingnormal.y(), graspingnormal.z()};
+        Eigen::Vector3f graspingnormal_rotated_eigen = T.linear() * graspingnormal_eigen;
+        octomap::point3d graspingnormal_rotated{graspingnormal_rotated_eigen.x(), graspingnormal_rotated_eigen.y(), graspingnormal_rotated_eigen.z()};
+        graspingnormal_rotated.normalize();
+
+
+        std::vector<int> histogram_graspdepth_left (bins_steps,0); // create 101 bins (0,100) fields populated with 0s. the 100 bins span the entire distance between antipodal grasping plates
+        std::vector<int> histogram_graspdepth_right (bins_steps,0); // create 101 bins (0,100) fields populated with 0s. the 100 bins span the entire distance between antipodal grasping plates
 
         for(auto it = grasping_pairs.begin(); it != grasping_pairs.end(); ++it)
         {
@@ -310,71 +319,66 @@ namespace GraspQualityMethods
             // transform coordinates according to T
             octomap::point3d world3d_left{GraspPlanningUtils::transform_point3d(T, gripper3d_left)};
             octomap::point3d world3d_right{GraspPlanningUtils::transform_point3d(T, gripper3d_right)};
-
-            // scale ray tunnel to gripper resolution
-            float tres = (float)target_tree_->getResolution();
-            octomap::point3d BBXmargin{tres,tres,tres}; // add a little margin to avoid failing zero-width ray tunnels
-            octomap::point3d min = GraspPlanningUtils::min_composite_vector(world3d_left, world3d_right) - BBXmargin;
-            octomap::point3d max = GraspPlanningUtils::max_composite_vector(world3d_left, world3d_right) + BBXmargin;
-            octomap::OcTreeGraspQuality* rescaledRayTunnel = GraspPlanningUtils::rescaleTreeStructure(target_tree_, gripper_tree_->getResolution(), min, max);
+            
             octomap::point3d direction{(world3d_right-world3d_left).normalized()}; // First to second
             const double distance{abs(world3d_right.distance(world3d_left))};
             octomap::point3d hit_left;
             octomap::point3d hit_right;
 
-            // store nodes hit into arrays
-            if (rescaledRayTunnel->castRay(world3d_left, direction, hit_left, true, distance)) // if occupied node was hit
+            // build histogram of angles
+            if (target_tree_->castRay(world3d_left, direction, hit_left, true, distance)) // if occupied node was hit
             {
-                hits_left.col(size_left++) = Eigen::Vector3f(hit_left.x(), hit_left.y(), hit_left.z());
+                octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_left);
+                if (n && target_tree_->isNodeOccupied(n)) // if occupied and not the first node
+                {
+                    ++histogram_graspdepth_left[((unsigned int)abs(world3d_left.distance(hit_left)/distance))*bins_steps];
+                }
             }
-            if (rescaledRayTunnel->castRay(world3d_right, -direction, hit_right, true, distance)) // if occupied node was hit
+            if (target_tree_->castRay(world3d_right, -direction, hit_right, true, distance)) // if occupied node was hit
             {
-                hits_right.col(size_right++) = Eigen::Vector3f(hit_right.x(), hit_right.y(), hit_right.z());
+                octomap::OcTreeGraspQualityNode* n = target_tree_->search(hit_right);
+                if (n && target_tree_->isNodeOccupied(n)) // if occupied
+                {
+                    ++histogram_graspdepth_right[((unsigned int)abs(world3d_right.distance(hit_right)/distance))*bins_steps];
+                }
             }
         }
 
-        // slice in place
-        hits_left.conservativeResize(Eigen::NoChange_t{}, size_left);
-        hits_right.conservativeResize(Eigen::NoChange_t{}, size_right);
+        // merge histograms into eigen array
+        Eigen::Array<int, bins_steps, 1> histogram_combined;
+        std::transform(histogram_graspdepth_left.begin(), histogram_graspdepth_left.end(), histogram_graspdepth_right.begin(), histogram_combined.data(), std::plus<int>());
+        unsigned int samples{(unsigned int)histogram_combined.sum()};
+        if (samples == 0U) return 0.0F; // if there were no hits the score is zero, no need for further processing
+
+        // calculate mean and std dev
+        const int mean = (histogram_combined * Eigen::Array<int, bins_steps, 1>::LinSpaced(0,bins_steps)).sum()/samples;
+        const float std_dev = sqrt((histogram_combined * Eigen::Array<int, bins_steps, 1>::LinSpaced(0-mean,bins_steps-mean)).square().sum() / samples);
         
-        // * fit planes through point sets (compute score)
-        Eigen::Matrix3Xf c_hits_left = hits_left.colwise() - hits_left.rowwise().mean(); // centered hitpoints
-        Eigen::Matrix3Xf c_hits_right = hits_right.colwise() - hits_right.rowwise().mean();
-        // Adjoint solver (covariance analysis)
-        // http://downloads.tuxfamily.org/eigen/eigen_CGLibs_Giugno_Pisa_2013.pdf slide 98
-        Eigen::Matrix3f cov_left = c_hits_left * c_hits_left.transpose();
-        Eigen::Matrix3f cov_right = c_hits_right * c_hits_right.transpose();
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eig_left, eig_right;
-        eig_left.computeDirect(cov_left); // faster than .compute() but less precision
-        eig_right.computeDirect(cov_right);
+        // calculate median
+        int median = 0;
+        int accumulator = 0;
+        int i = 0;
+        while (accumulator < (int)samples/2)
+        {
+            int new_bin = histogram_combined[i];
+            if (abs((int)samples/2 - accumulator - new_bin) < abs((int)samples/2 - accumulator)) median = i;
+            accumulator += new_bin;
+            ++i;
+        }
 
-        Eigen::Vector3f normal_left = eig_left.eigenvectors().col(0);
-        Eigen::Vector3f normal_right = eig_right.eigenvectors().col(0);
+        // calculate number of negative voxel interactions target-gripper to substract from score
+        const int collisions = GraspPlanningUtils::negative_collisions(gripper_tree_, target_tree_, T);
 
-        /* SVD attempt
-        Eigen::JacobiSVD<Eigen::MatrixX3f> svd_left(c_hits_left, Eigen::ComputeThinU | Eigen::ComputeThinV);
-        Eigen::JacobiSVD<Eigen::MatrixX3f> svd_right(c_hits_right, Eigen::ComputeThinU | Eigen::ComputeThinV);
+        // assign score
+        float score = ((float)(bins_steps-abs(mean-median))/bins_steps) * weight_mean + std_saturation/std::max(std_dev,std_saturation) * (1.0F-weight_mean);
 
-        Eigen::Vector3f normal_left = svd_left.matrixU().col(2);
-        Eigen::Vector3f normal_right = svd_right.matrixU().col(2);
-        */
-        
-        // * compute score
-        octomap::point3d normal_left_3d{normal_left.x(), normal_left.y(), normal_left.z()};
-        octomap::point3d normal_right_3d{normal_right.x(), normal_right.y(), normal_right.z()};
-        float rot_angle_rad_left{(float)gripper_tree_->getGraspingNormal().angleTo(normal_left_3d)}; // ! incorrect, gripper not rotated
-        int angle_deg_left = (int)(abs(cos((rot_angle_rad_left))*90)); // angle always between (0-90)
-        if (angle_deg_left < 0 || angle_deg_left >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg_left << std::endl;
-        float rot_angle_rad_right{(float)gripper_tree_->getGraspingNormal().angleTo(normal_right_3d)}; // ! incorrect, gripper not rotated
-        int angle_deg_right = (int)(abs(cos((rot_angle_rad_right))*90)); // angle always between (0-90)
-        if (angle_deg_right < 0 || angle_deg_right >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg_right << std::endl;
-
-        float score_normal_vector = (float)(angle_deg_left + angle_deg_right)/180.0F; // 1 if both vectors are at 90deg from grasping normal
-        float score_surface_variance = 1.0F;
-
-        // * normalise score
-        float weight = 1.0F;//0.5F;
-        return (float)score_normal_vector*weight + (float)score_surface_variance*(1.0F-weight);
+        float fraction_samples = ((float)(std::max(((int)samples)-collisions,0)))/((float)grasping_pairs.size()*2.0F);
+        if (score*fraction_samples > 1.0F)
+        {
+            std::cerr << "SCORE OVER 1 (" << score*fraction_samples << ")" << std::endl;
+            std::cout << "mean score = " << mean << ", median score = " << median << ", mean-median score = " << (bins_steps-abs(mean-median))/bins_steps << ", stddev score = " << std_saturation/std::max(std_dev,std_saturation) << ", samples = " << samples << ", grasping_pairs.size() = " << grasping_pairs.size() << ", collisions = " << collisions << ", fraction_samples = " << fraction_samples << ", score = " << score << ", normalised score = " << score*fraction_samples << std::endl;
+        }
+        return score*fraction_samples; // normalise score accounting for % of nodes hit from total
     }
 
     /**

@@ -92,13 +92,13 @@ namespace GraspQualityMethods
                     target_tree_->getNormal(hit_left, points); // ! Toggle to use getNormal()
                     if (!points.empty())
                     {
-                        int best_option_angle_deg{-1};
+                        int best_option_angle_deg{91};
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                         {
-                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
+                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(direction,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
-                            if (angle_deg > best_option_angle_deg) best_option_angle_deg = angle_deg;
+                            if (angle_deg < best_option_angle_deg) best_option_angle_deg = angle_deg;
                         }
                         ++histogram_angles_left[best_option_angle_deg];
                     }
@@ -113,13 +113,13 @@ namespace GraspQualityMethods
                     target_tree_->getNormal(hit_right, points); // ! Toggle to use getNormal()
                     if (!points.empty())
                     {
-                        int best_option_angle_deg{-1};
+                        int best_option_angle_deg{91};
                         for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); it_3d++)
                         {
-                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(graspingnormal_rotated,*it_3d)};
+                            float rot_angle_rad{GraspPlanningUtils::safe_angleTo(direction,*it_3d)};
                             int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                             if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
-                            if (angle_deg > best_option_angle_deg) best_option_angle_deg = angle_deg;
+                            if (angle_deg < best_option_angle_deg) best_option_angle_deg = angle_deg;
                         }
                         ++histogram_angles_right[best_option_angle_deg];
                     }
@@ -162,14 +162,18 @@ namespace GraspQualityMethods
         }
         */
 
+        // calculate number of negative voxel interactions target-gripper to substract from score
+        const int collisions = GraspPlanningUtils::negative_collisions(gripper_tree_, target_tree_, T);
+
         // assign score based on heuristic linear regression slopes
-        float score = ((float)mean)/90.0F * weight_mean + std_saturation/std::max(std_dev,std_saturation) * (1.0F-weight_mean);
+        float score = (90-(float)mean)/90.0F * weight_mean + std_saturation/std::max(std_dev,std_saturation) * (1.0F-weight_mean);
         // ? Maybe use median and mean, instead of std dev?
-        float fraction_samples = (float)samples/((float)grasping_pairs.size()*2.0F);
+        float fraction_samples = ((float)(std::max(((int)samples)-collisions,0)))/((float)grasping_pairs.size()*2.0F);
+
         if (score*fraction_samples > 1.0F)
         {
             std::cerr << "SCORE OVER 1 (" << score*fraction_samples << ")" << std::endl;
-            std::cout << "Mean score = " << ((float)mean)/90.0F << ", stddev score = " << std_saturation/std::max(std_dev,std_saturation) << ", samples = " << samples << ", grasping_pairs.size() = " << grasping_pairs.size() << ", fraction_samples = " << fraction_samples << ", score = " << score << ", normalised score = " << score*fraction_samples << std::endl;
+            std::cout << "Mean score = " << (90-(float)mean)/90.0F << ", stddev score = " << std_saturation/std::max(std_dev,std_saturation) << ", samples = " << samples << ", grasping_pairs.size() = " << grasping_pairs.size() << ", fraction_samples = " << fraction_samples << ", score = " << score << ", normalised score = " << score*fraction_samples << std::endl;
         }
         return score*fraction_samples; // normalise score accounting for % of nodes hit from total
     }
@@ -202,7 +206,6 @@ namespace GraspQualityMethods
     {
         // ! Weights
         const int zero_crossing{45};
-
         float score{0};
 
         if (grasping_pairs.empty()) grasping_pairs = GraspPlanningUtils::graspingPairs("yz", gripper_tree_); // only initialise once, as this fcn call is slow
@@ -236,15 +239,15 @@ namespace GraspQualityMethods
                 octomap::point3d_collection points;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree_, hit_left);
                 if (n && target_tree_->isNodeOccupied(n) && target_tree_->getNormal(hit_left, points)) // if occupied and has normal (is in surface) // ! Toggle to use getNormal()
                 {
-                    int best_normal_option_angle = -1;
+                    int best_normal_option_angle = 91;
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
-                        float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
+                        float rot_angle_rad{GraspPlanningUtils::safe_angleTo(direction,*it_3d)};
                         int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                         if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS left ANGLEDEG=" << angle_deg << std::endl;
-                        if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
+                        if (angle_deg < best_normal_option_angle) best_normal_option_angle = angle_deg;
                     }
-                    score += ((float)(best_normal_option_angle-45))/45.0F; // a 45 deg angle would give 0 reward/penalty, a 0 or 90 would give (1) penalty/reward, respectively.
+                    score += std::max(((float)(zero_crossing-best_normal_option_angle))/((float)zero_crossing),-1.0F); // an angle equal to zero_crossing would give 0 reward/penalty, a 90deg would give (1) reward, and a decreasing angle linearly increases penalty up until a -1.0F penalty.
                 }
             }
             if (target_tree_->castRay(world3d_right, -direction, hit_right, true, distance)) // if occupied node was hit
@@ -253,20 +256,24 @@ namespace GraspQualityMethods
                 octomap::point3d_collection points;// = GraspPlanningUtils::get_filtered_surface_normals(target_tree_, hit_right);
                 if (n && target_tree_->isNodeOccupied(n) && target_tree_->getNormal(hit_right, points)) // if occupied and has normal (is in surface) // ! Toggle to use getNormal()
                 {
-                    int best_normal_option_angle = -1;
+                    int best_normal_option_angle = 91;
                     for (octomap::point3d_collection::iterator it_3d = points.begin(); it_3d != points.end(); ++it_3d)
                     {
-                        float rot_angle_rad{GraspPlanningUtils::safe_angleTo(grasping_normal_rotated,*it_3d)};
+                        float rot_angle_rad{GraspPlanningUtils::safe_angleTo(direction,*it_3d)};
                         int angle_deg = (int)(abs(cos((rot_angle_rad))*90)); // angle always between (0-90)
                         if (angle_deg < 0 || angle_deg >90) std::cerr << "OUTOFBOUNDS right ANGLEDEG=" << angle_deg << std::endl;
-                        if (angle_deg > best_normal_option_angle) best_normal_option_angle = angle_deg;
+                        if (angle_deg < best_normal_option_angle) best_normal_option_angle = angle_deg;
                     }
-                    score += std::max(((float)(best_normal_option_angle-zero_crossing))/(90.0F-(float)zero_crossing),-1.0F); // an angle equal to zero_crossing would give 0 reward/penalty, a 90deg would give (1) reward, and a decreasing angle linearly increases penalty up until a -1.0F penalty.
+                    score += std::max(((float)(zero_crossing-best_normal_option_angle))/((float)zero_crossing),-1.0F); // an angle equal to zero_crossing would give 0 reward/penalty, a 90deg would give (1) reward, and a decreasing angle linearly increases penalty up until a -1.0F penalty.
                 }
             }
         }
+
+        // calculate number of negative voxel interactions target-gripper to substract from score
+        const float collisions = GraspPlanningUtils::negative_collisions(gripper_tree_, target_tree_, T);
+
         // normalise score
-        score /= (float)grasping_pairs.size()*2.0F; // divide by sample size
+        score *= std::max(((float)grasping_pairs.size()*2.0F - collisions)/((float)grasping_pairs.size()*2.0F), 0.0F)/((float)grasping_pairs.size()*2.0F); // fraction out number of collision measurements from grasping pairs size and divide by sample size to normalise
         if (score>1.0F)
         {
             std::cerr << "[gq_raycasting] score is " << score << ", not properly normalised" << std::endl;

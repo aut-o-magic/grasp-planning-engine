@@ -21,6 +21,28 @@ namespace GraspPlanningUtils
     }
 
     /**
+     * Calculate number of negative interactions between gripper and target octrees
+     * @param source source tree, will be transformed to target reference frame
+     * @param target target tree, anchored in its reference frame
+     * @param T transformation to transform source to target reference frames
+     */
+    template<typename NODE_A, typename NODE_B>
+    inline int negative_collisions(const octomap::OccupancyOcTreeBase<NODE_A>* source, const octomap::OccupancyOcTreeBase<NODE_B>* target, const Eigen::Affine3f& T)
+    {
+        int collisions{0};
+        for (octomap::OcTreeGripper::leaf_iterator it = source->begin_leafs(), end=source->end_leafs(); it!= end; ++it)
+        {
+            octomap::point3d tgt3d{transform_point3d(T, it.getCoordinate())};
+            octomap::OcTreeGraspQualityNode* n = target->search(tgt3d);
+            if (n && target->isNodeOccupied(n)) // if target node is occupied
+            {
+                if(!it->isGraspingSurface()) ++collisions;
+            }
+        }
+        return collisions;
+    }
+
+    /**
      * Calculate the angle between two vectors safetly, handling floating-point imprecision safely
      * @param lhs Vector 1
      * @param rhs Vector 2

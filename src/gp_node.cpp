@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     ("write_color_target", po::value<std::string>()->implicit_value("colortree_target.ot"), "Write to file ColorOcTree version of target octree")
     ("write_color_gripper", po::value<std::string>()->implicit_value("colortree_gripper.ot"), "Write to file ColorOcTree version of gripper octree")
     ("write_surface_normals_density", "Visualise the surface normals density of the target tree")
-    ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-6]")
+    ("gp_algorithm", po::value<unsigned int>(), "Select grasp planning algorithm to use in idx range [1-7]")
     ("global_analysis", "Perform a global graspability analysis")
     ("local_analysis", po::value<std::vector<float>>(), "Perform a local analysis at a defined target 3D point. Pass arg with no spaces and with equal sign (i.e. --local_analysis={x,y,z}) [m]")
     ;

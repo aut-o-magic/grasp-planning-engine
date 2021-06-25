@@ -112,7 +112,7 @@ public:
         gripper_tree_->importOcTree(octree);
         gripper_tree_->setGraspingNormal(gripper_normal);
         gripper_tree_->expand();
-        gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
+        gripper_tree_->updateNumGraspableVoxels();
     }
 
     /**
@@ -130,7 +130,7 @@ public:
         octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
         this->gripper_tree_->setOrigin(grasp_center_point);
         this->gripper_tree_->expand();
-        this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
+        this->gripper_tree_->updateNumGraspableVoxels();
     }
 
     /**
@@ -142,7 +142,7 @@ public:
         std::cout << "[set_gripper_tree] started..." << std::endl;
         this->gripper_tree_ = octree;
         this->gripper_tree_->expand();
-        this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
+        this->gripper_tree_->updateNumGraspableVoxels();
     }
 
     /**
@@ -159,7 +159,7 @@ public:
         octomap::point3d grasp_center_point{add_graspable_region(min_BBX, max_BBX)};
         this->gripper_tree_->setOrigin(grasp_center_point);
         this->gripper_tree_->expand();
-        this->gripper_tree_->updateNumGraspableVoxels(); // ! Temporary patch
+        this->gripper_tree_->updateNumGraspableVoxels();
     }
 
     const octomap::OcTreeGripper* get_gripper_tree() const {return gripper_tree_;}
@@ -438,7 +438,9 @@ private:
         }
         this->gripper_tree_->updateInnerOccupancy();
         this->gripper_tree_->updateNumGraspableVoxels();
+        // Mark as origin bottom center of grasping region
         octomap::point3d center_bbx{(max-min)*0.5 + min};
+        center_bbx.y() = min.y(); // ! Adjust to make it work with gripper normals not along the y-axis
         return center_bbx;
     }
 

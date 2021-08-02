@@ -1,11 +1,29 @@
 # Grasp Planning Engine
-
-## Usage
-Compile and launch the program as exemplified in the following code block, where ```--opt arg``` is to be substituted with the program options tabulated below.
-```
-colcon build
+<table>
+  <thead>
+  <tr>
+    <th> Usage </th>
+    <th> Sample global analysis </th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+    <td>
+      <p>
+        Compile and launch the program as exemplified in the following code block, where <code>--opt arg</code> is to be substituted with one or more program options tabulated below.
+      </p>
+      <pre><code>colcon build
 ./build/grasp-planning-engine/gp_node --opt arg
-```
+</code></pre>
+    </td>
+    <td>
+      <img src="sample_globalAnalysis_Envisat.png" alt="Sample global graspability analysis of Envisat satellite" width="2000"/>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+## CLI Options
 
 Option \<Argument> | Description
 --- | ---
@@ -21,6 +39,7 @@ Option \<Argument> | Description
 |```--gp_algorithm <idx>``` | Select grasp planning algorithm to use in idx range [1-7] |
 |```--global_analysis``` | Perform a global graspability analysis |
 |```--local_analysis=<{x,y,z}>``` | Perform a local analysis at a defined target 3D point. Must pass arg with no spaces and with equal sign (i.e. ```--local_analysis={x,y,z}```) [m]
+
 
 
 ## Algorithms
